@@ -6,6 +6,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod hash;
+pub mod residual;
 pub mod verdict;
 
 use chrys_source::Frame;
@@ -17,6 +19,15 @@ pub enum CompareError {
     /// A frame with zero pixels was given to `compare`.
     #[error("cannot compare an empty frame")]
     EmptyFrame,
+    /// The base and candidate frames differ in size, so no per-pixel
+    /// buffer can be built over them.
+    #[error("shape mismatch: base is {base:?}, candidate is {candidate:?}")]
+    ShapeMismatch {
+        /// The base frame's width and height, in pixels.
+        base: (u32, u32),
+        /// The candidate frame's width and height, in pixels.
+        candidate: (u32, u32),
+    },
 }
 
 /// Compare a base frame to a candidate frame and return a verdict.

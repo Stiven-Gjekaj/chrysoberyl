@@ -26,6 +26,12 @@ enum Command {
         base: PathBuf,
         /// The path to the candidate image.
         candidate: PathBuf,
+        /// Print the four-line digest report instead of the verdict text,
+        /// and exit 0 even when the pair differs. Every digest covers raw
+        /// RGBA8 bytes or the verdict's `Display` text, never a re-encoded
+        /// file.
+        #[arg(long)]
+        hash_only: bool,
     },
 }
 
@@ -43,16 +49,31 @@ fn main() -> ExitCode {
 fn run() -> anyhow::Result<ExitCode> {
     let cli = Cli::parse();
     match cli.command {
-        Command::Compare { base, candidate } => run_compare(&base, &candidate),
+        Command::Compare {
+            base,
+            candidate,
+            hash_only,
+        } => run_compare(&base, &candidate, hash_only),
     }
 }
 
-fn run_compare(base_path: &Path, candidate_path: &Path) -> anyhow::Result<ExitCode> {
+fn run_compare(
+    base_path: &Path,
+    candidate_path: &Path,
+    hash_only: bool,
+) -> anyhow::Result<ExitCode> {
     let source = RasterSource::new();
     let base_frame = load_first_frame(&source, base_path)?;
     let candidate_frame = load_first_frame(&source, candidate_path)?;
 
     let verdict = chrys_core::compare(&base_frame, &candidate_frame)?;
+
+    if hash_only {
+        let digests = chrys_core::hash::digest_report(&base_frame, &candidate_frame, &verdict)?;
+        print!("{digests}");
+        return Ok(ExitCode::from(0));
+    }
+
     print!("{verdict}");
 
     Ok(match verdict {

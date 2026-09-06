@@ -11,3 +11,4 @@ workspace = true
 [dependencies]
 chrys-source = { path = "../chrys-source" }
 thiserror.workspace = true
+sha2.workspace = true
