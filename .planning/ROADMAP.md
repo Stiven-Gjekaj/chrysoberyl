@@ -74,7 +74,7 @@ reassigns as follows, and lands at eight phases, inside the 5-to-8 range for
   4. The tool refuses a pair it cannot register, and states why, instead of giving a verdict it cannot support.
   5. CI hashes the raw RGBA8 output of the same pair on Linux, macOS, Windows, x86-64, and aarch64, and the hash matches on every commit. This is the phase's determinism exit gate, and the mechanism every later format phase reuses.
 
-**Plans**: 7/8 plans executed
+**Plans**: 8/8 plans executed
 
 Plans:
 **Wave 1**
@@ -107,7 +107,7 @@ Plans:
 
 **Wave 8** *(blocked on Wave 7 completion)*
 
-- [ ] 01-08-PLAN.md — Determinism guards, watched failing on purpose
+- [x] 01-08-PLAN.md — Determinism guards, watched failing on purpose
 
 **Note**: the six-runner matrix cannot run while this repository has no remote,
 which PROJECT.md records as a decision. Plan 01-03 writes and validates the
@@ -228,7 +228,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Raster engine and determinism proof | 7/8 | In Progress|  |
+| 1. Raster engine and determinism proof | 8/8 | In Progress|  |
 | 2. Source trait and a second format | 0/TBD | Not started | - |
 | 3. Baseline, rules and CI gate | 0/TBD | Not started | - |
 | 4. SVG rasterization | 0/TBD | Not started | - |
