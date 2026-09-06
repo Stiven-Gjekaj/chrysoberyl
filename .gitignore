@@ -1,3 +1,9 @@
+# The agent harness writes here. .claude/worktrees holds a full checkout with
+# its own target directory, and it reached 169 MB during one wave. .gsd holds
+# a dispatch sentinel. Neither is source.
+.claude/
+.gsd/
+
 # PAI registers a project by writing this file. It holds machine state, not
 # a decision. No other repository of this author tracks it.
 Notes/PAI.md
