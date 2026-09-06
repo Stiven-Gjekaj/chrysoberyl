@@ -1,0 +1,130 @@
+# The determinism proof. This workflow runs one command on six runner
+# labels and compares the results. A red `agree` job means a portability
+# bug in the comparison path. It is a release blocker, not a flaky test to
+# retry.
+#
+# macos-15-intel is the last x86-64 macOS label GitHub will offer. It
+# sunsets in August 2027, so a future maintainer is not surprised when it
+# disappears.
+#
+# Linux and Windows aarch64 runners (ubuntu-24.04-arm, windows-11-arm) are
+# standard, free, unlimited-minute runners on public repositories, per the
+# 2025 and 2026 GitHub Actions changelog entries. No emulation layer and no
+# self-hosted machine is needed to reach every architecture this project
+# cares about.
+name: determinism
+
+"on":
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  digest:
+    name: digest (${{ matrix.label }})
+    runs-on: ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        label:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+          - macos-15
+          - macos-15-intel
+          - windows-2022
+          - windows-11-arm
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # No toolchain-install action runs here. The runner's own rustup
+      # reads rust-toolchain.toml and installs the pinned channel with no
+      # override, which is the determinism input this project depends on.
+      - name: Build in release
+        shell: bash
+        run: cargo build --release -p chrys-cli
+
+      - name: Run the digest report on the committed pair
+        shell: bash
+        run: |
+          cargo run -q --release -p chrys-cli -- compare tests/golden/pair-01/base.png tests/golden/pair-01/candidate.png --hash-only > digest.txt
+
+      - name: Upload the digest report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: digest-${{ matrix.label }}
+          path: digest.txt
+
+  agree:
+    name: agree
+    needs: digest
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download every digest report
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: reports
+
+      - name: Compare the six digest reports
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          digest_names=(decode-base decode-candidate residual verdict)
+
+          labels=()
+          files=()
+          for dir in reports/digest-*; do
+            labels+=("${dir#reports/digest-}")
+            files+=("$dir/digest.txt")
+          done
+
+          value_at() {
+            # value_at FILE LINE_NUMBER (1-indexed) prints the digest field
+            # on that line, dropping the leading label and the one space
+            # after it.
+            sed -n "${2}p" "$1" | cut -d' ' -f2-
+          }
+
+          disagreement=0
+          for line_number in 1 2 3 4; do
+            reference="$(value_at "${files[0]}" "$line_number")"
+            for file in "${files[@]}"; do
+              if [ "$(value_at "$file" "$line_number")" != "$reference" ]; then
+                disagreement=1
+              fi
+            done
+          done
+
+          if [ "$disagreement" -ne 0 ]; then
+            echo "The six runners do not agree. A red agree job is a"
+            echo "portability bug in the comparison path, and a release"
+            echo "blocker, not a flaky test to retry."
+            echo
+            for i in "${!labels[@]}"; do
+              echo "== ${labels[$i]} =="
+              cat "${files[$i]}"
+            done
+            echo
+            for line_index in 0 1 2 3; do
+              line_number=$((line_index + 1))
+              name="${digest_names[$line_index]}"
+              for i in "${!files[@]}"; do
+                for j in "${!files[@]}"; do
+                  if [ "$i" -lt "$j" ]; then
+                    value_i="$(value_at "${files[$i]}" "$line_number")"
+                    value_j="$(value_at "${files[$j]}" "$line_number")"
+                    if [ "$value_i" != "$value_j" ]; then
+                      echo "disagreement on ${name}: ${labels[$i]} and ${labels[$j]} differ"
+                    fi
+                  fi
+                done
+              done
+            done
+            exit 1
+          fi
+
+          echo "All six runners agree on the four digests:"
+          cat "${files[0]}"
