@@ -187,7 +187,15 @@ mod tests {
                 assert_eq!(regions.len(), 1);
                 let region = &regions[0];
                 assert_eq!(region.kind, ChangeKind::Recoloured);
-                assert_eq!(region.bbox, BoundingBox { x: 3, y: 3, width: 2, height: 2 });
+                assert_eq!(
+                    region.bbox,
+                    BoundingBox {
+                        x: 3,
+                        y: 3,
+                        width: 2,
+                        height: 2
+                    }
+                );
                 let delta = region.colour_delta.as_ref().expect("colour delta present");
                 assert_eq!(delta.base, [240, 240, 240, 255]);
                 assert_eq!(delta.candidate, [10, 200, 10, 255]);
@@ -206,6 +214,9 @@ mod tests {
             hints: Vec::new(),
         };
         let other = solid_frame(1, 1, [0, 0, 0, 255]);
-        assert!(matches!(compare(&empty, &other), Err(CompareError::EmptyFrame)));
+        assert!(matches!(
+            compare(&empty, &other),
+            Err(CompareError::EmptyFrame)
+        ));
     }
 }

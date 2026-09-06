@@ -167,13 +167,15 @@ mod tests {
     fn is_change_is_true_only_for_changed() {
         assert!(!Verdict::Identical.is_change());
         assert!(Verdict::Changed { regions: vec![] }.is_change());
-        assert!(!Verdict::Refused {
-            reason: RefusalReason::DimensionMismatch {
-                base: (1, 1),
-                candidate: (2, 2),
-            },
-        }
-        .is_change());
+        assert!(
+            !Verdict::Refused {
+                reason: RefusalReason::DimensionMismatch {
+                    base: (1, 1),
+                    candidate: (2, 2),
+                },
+            }
+            .is_change()
+        );
     }
 
     #[test]

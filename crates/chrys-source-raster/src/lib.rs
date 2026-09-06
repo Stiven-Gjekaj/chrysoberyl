@@ -180,7 +180,8 @@ mod tests {
         let path = dir.join("chrys-source-raster-test-not-an-image.png");
         {
             let mut file = std::fs::File::create(&path).expect("create temp file");
-            file.write_all(b"this is not a png file").expect("write temp file");
+            file.write_all(b"this is not a png file")
+                .expect("write temp file");
         }
 
         let source = RasterSource::new();
