@@ -34,24 +34,29 @@ pub enum CompareError {
 /// Compare a base frame to a candidate frame and return a verdict.
 ///
 /// The order of work is fixed: a shape check, then registration, then the
-/// confidence test that decides a refusal, and only then classification.
-/// `compare` refuses a pair whose dimensions differ, because this project
-/// assumes near-identical pairs and does not scale or crop to make an
-/// unequal pair fit. When the shapes match, `compare` runs phase
-/// correlation and scores how sharply it peaks; a pair whose peak is not
-/// sharp enough to trust is refused there, before any classification work
-/// runs on it, because CORE-06 and CORE-07 require the engine to say it
-/// cannot register a pair rather than guess at one. When the pair clears
-/// that test, `compare` walks both buffers once and collects the bounding
-/// box of every pixel whose RGBA bytes differ.
+/// confidence test that decides a refusal, then the local block match, and
+/// only then classification. `compare` refuses a pair whose dimensions
+/// differ, because this project assumes near-identical pairs and does not
+/// scale or crop to make an unequal pair fit. When the shapes match,
+/// `compare` runs phase correlation and scores how sharply it peaks; a
+/// pair whose peak is not sharp enough to trust is refused there, before
+/// any classification work runs on it, because CORE-06 and CORE-07
+/// require the engine to say it cannot register a pair rather than guess
+/// at one. When the pair clears that test, `compare` runs the local block
+/// match and walks the resulting `ResidualField` once, collecting the
+/// bounding box of every pixel whose residual colour bytes are non-zero,
+/// so a pair whose content moved is not reported as changed everywhere
+/// just because it was not compared in place.
 ///
 /// The single-region bounding box this function returns is the degenerate
 /// case of connected-component labelling, which plan 01-07 replaces with
 /// `imageproc`'s labeller so that separate changed areas are reported as
-/// separate regions. The `delta_e` this function reports is a stand-in
-/// metric: it is the Euclidean distance in straight RGB, not a perceptual
-/// colour distance, until plan 01-07 routes colour difference through
-/// `palette`'s Lab colour space.
+/// separate regions, and plan 01-07 is also where the `ResidualField`'s
+/// own per-block offsets and colour bytes at the bounding box's own
+/// registered position become the region's reported data. The `delta_e`
+/// this function reports is a stand-in metric: it is the Euclidean
+/// distance in straight RGB, not a perceptual colour distance, until plan
+/// 01-07 routes colour difference through `palette`'s Lab colour space.
 pub fn compare(base: &Frame, candidate: &Frame) -> Result<Verdict, CompareError> {
     if base.pixel_count() == 0 || candidate.pixel_count() == 0 {
         return Err(CompareError::EmptyFrame);
@@ -82,6 +87,8 @@ pub fn compare(base: &Frame, candidate: &Frame) -> Result<Verdict, CompareError>
         });
     }
 
+    let field = register::block_match(base, candidate, refined.whole)?;
+
     let base_pixels = base.rgba8();
     let candidate_pixels = candidate.rgba8();
     let width = base.width;
@@ -95,7 +102,7 @@ pub fn compare(base: &Frame, candidate: &Frame) -> Result<Verdict, CompareError>
     for y in 0..height {
         for x in 0..width {
             let idx = ((y * width + x) * 4) as usize;
-            if base_pixels[idx..idx + 4] != candidate_pixels[idx..idx + 4] {
+            if field.samples[idx..idx + 3] != [0, 0, 0] {
                 min_x = Some(min_x.map_or(x, |v| v.min(x)));
                 min_y = Some(min_y.map_or(y, |v| v.min(y)));
                 max_x = Some(max_x.map_or(x, |v| v.max(x)));
@@ -259,14 +266,38 @@ mod tests {
     fn a_recoloured_rectangle_returns_one_recoloured_region() {
         let width = 256;
         let height = 256;
-        let base = frame_with_anchor_rects(width, height, [240, 240, 240, 255]);
+        let mut base = frame_with_anchor_rects(width, height, [240, 240, 240, 255]);
+
+        // Plan 01-06 wires a local block match into `compare`. A block
+        // match cannot tell a purely recoloured, flat 64x64 rectangle from
+        // a block that moved a few pixels into an equally flat
+        // surrounding background: both explanations score the same low
+        // sum of absolute differences, and the plan's own tie-break rule
+        // only breaks a tie between offsets, not between a real recolour
+        // and a coincidental colour match found by drifting off the
+        // block's own area. A moat of a colour far from both the
+        // background and the recolour, wide enough to cover the block
+        // search's own reachable radius, removes that coincidence: any
+        // block drifting into it scores worse, not better, than staying
+        // in place, so the recoloured block's own true, zero offset stays
+        // the only good answer.
+        paint_rect(&mut base.pixels, width, 72, 72, 112, 112, [0, 0, 0, 255]);
+        paint_rect(
+            &mut base.pixels,
+            width,
+            96,
+            96,
+            64,
+            64,
+            [240, 240, 240, 255],
+        );
         let mut candidate = base.clone();
 
         // Recolour a 64x64 rectangle at (96, 96) in the candidate only.
-        // The anchor rectangles `frame_with_anchor_rects` paints stay
-        // identical in both frames, so registration has structure to
-        // register this near-identical pair with confidence, before
-        // classification ever sees it.
+        // The anchor rectangles `frame_with_anchor_rects` paints (and the
+        // moat above) stay identical in both frames, so registration has
+        // structure to register this near-identical pair with confidence,
+        // before classification ever sees it.
         for y in 96..160u32 {
             for x in 96..160u32 {
                 let idx = ((y * width + x) * 4) as usize;

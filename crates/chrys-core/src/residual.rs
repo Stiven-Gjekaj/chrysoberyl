@@ -1,17 +1,18 @@
-//! The residual buffer: the per-pixel difference between two frames.
+//! The residual buffer: the per-pixel difference between two frames, once
+//! both the global shift and each block's own local shift are removed.
 
 use crate::CompareError;
+use crate::register;
 use chrys_source::Frame;
 
 /// Return the residual RGBA8 buffer between `base` and `candidate`.
 ///
-/// The buffer has the same length as the two input frames. Each of the
-/// red, green and blue bytes is the absolute difference of the
-/// corresponding input bytes, and the alpha byte is always 255.
-///
-/// Plan 01-06 replaces the body of this function with the real residual
-/// field this project's classify stage needs, and keeps this signature, so
-/// the digest contract built on top of it does not move.
+/// The buffer has the same length as the two input frames. This runs the
+/// full registration pipeline (`phase_correlate`, then `block_match`) and
+/// renders the `ResidualField` it produces: each of the red, green and
+/// blue bytes is the absolute difference of the corresponding bytes once
+/// the pair is aligned, both globally and at the block that pixel falls
+/// in, and the alpha byte is always 255.
 ///
 /// Returns `CompareError::ShapeMismatch` when the frames differ in size.
 pub fn residual_rgba8(base: &Frame, candidate: &Frame) -> Result<Vec<u8>, CompareError> {
@@ -22,21 +23,9 @@ pub fn residual_rgba8(base: &Frame, candidate: &Frame) -> Result<Vec<u8>, Compar
         });
     }
 
-    let base_pixels = base.rgba8();
-    let candidate_pixels = candidate.rgba8();
-    let mut residual = Vec::with_capacity(base_pixels.len());
-
-    for chunk_index in 0..base.pixel_count() {
-        let idx = chunk_index * 4;
-        for channel in 0..3 {
-            let a = base_pixels[idx + channel];
-            let b = candidate_pixels[idx + channel];
-            residual.push(a.abs_diff(b));
-        }
-        residual.push(255);
-    }
-
-    Ok(residual)
+    let (refined, _surface) = register::phase_correlate(base, candidate)?;
+    let field = register::block_match(base, candidate, refined.whole)?;
+    Ok(field.samples)
 }
 
 #[cfg(test)]

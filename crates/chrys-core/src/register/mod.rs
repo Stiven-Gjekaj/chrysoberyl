@@ -7,6 +7,7 @@
 //! the whole registration scope here: no feature matching, no homography,
 //! no optical flow.
 
+pub mod block_match;
 pub mod confidence;
 pub mod integral;
 pub mod luma;
@@ -15,6 +16,9 @@ pub mod subpixel;
 pub mod warp;
 pub mod window;
 
+pub use block_match::{
+    BLOCK_SIDE, BlockOffset, PYRAMID_LEVELS, ResidualField, SEARCH_HALF_WIDTH, block_match,
+};
 pub use confidence::{PeakConfidence, REFUSAL_THRESHOLD, assess_peak};
 pub use integral::IntegralImage;
 pub use luma::to_luma_downsampled;
