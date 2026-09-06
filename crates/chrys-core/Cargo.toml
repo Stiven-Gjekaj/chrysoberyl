@@ -12,3 +12,5 @@ workspace = true
 chrys-source = { path = "../chrys-source" }
 thiserror.workspace = true
 sha2.workspace = true
+rustfft.workspace = true
+libm.workspace = true

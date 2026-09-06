@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 
 pub mod hash;
+pub mod register;
 pub mod residual;
 pub mod verdict;
 
