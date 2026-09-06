@@ -22,6 +22,26 @@ permissions:
   contents: read
 
 jobs:
+  # The guards job is the source-level half of the proof; the matrix
+  # below (digest and agree) is the measured half. Both are needed: a
+  # source-level guard cannot see a rounding difference that only shows
+  # up at runtime, and a measured digest agreement cannot see a platform
+  # transcendental or a banned dependency that has not yet caused a
+  # visible mismatch. scripts/determinism-drill.sh is the re-runnable
+  # drill that plants a defect against each guard here and confirms it
+  # goes red; it is run by a person on a machine that can build two CPU
+  # architectures, and is not part of this job or this matrix.
+  guards:
+    name: guards
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run the determinism guards
+        shell: bash
+        run: cargo test -p chrys-core --test determinism
+
   digest:
     name: digest (${{ matrix.label }})
     runs-on: ${{ matrix.label }}

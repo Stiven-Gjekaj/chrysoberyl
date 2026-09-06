@@ -1,7 +1,6 @@
-//! Guards for DET-06 and, once Task 2 adds it, DET-02: the comparison path
-//! calls no platform transcendental function, and no crate that can
-//! produce a GPU pixel or decode a raster format enters `chrys-core`'s own
-//! dependency graph.
+//! Guards for DET-06 and DET-02: the comparison path calls no platform
+//! transcendental function, and no crate that can produce a GPU pixel or
+//! decode a raster format enters `chrys-core`'s own dependency graph.
 //!
 //! **What DET-06 turned out to mean.** The requirement reads as one rule,
 //! but it splits into two very unequal halves.
@@ -40,6 +39,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 /// Standard-library floating-point methods this project's comparison path
 /// may never call. Every one of these is documented, at
@@ -69,6 +69,52 @@ const ALLOWED_MATHS: &[(&str, &str)] = &[(
 /// comment and `.planning/phases/01-raster-engine-and-determinism-proof/
 /// 01-RESEARCH.md`'s Pitfall 2.
 const FUSED_MULTIPLY_ADD: &str = "mul_add";
+
+/// Crate names `chrys-core`'s own dependency graph may never contain.
+///
+/// Two rules produce this list. First, `.planning/PROJECT.md`'s own
+/// invariant: no pixel that enters a comparison is produced by a GPU. No
+/// crate that can drive a GPU may enter the engine's graph, so this list
+/// names the graphics and GPU crates this project's own research
+/// (`.planning/research/ARCHITECTURE.md`) identifies as what this
+/// project would otherwise reach for (`wgpu` for the future `chrys-gpu`
+/// compute mirror, `slint` for the future `chrys-window` native window),
+/// plus the other crate names most Rust GPU and graphics work reaches
+/// for instead, so a differently-named route to a GPU is still caught by
+/// category. Second, `.planning/research/ARCHITECTURE.md`'s format-blind
+/// rule: `chrys-core` sees only `Vec<Frame>` of RGBA8, and a format
+/// crate anywhere in its graph would mean a format reached the engine,
+/// defeating the "no per-format special case" rule this project treats
+/// as a compile-time fact, not a rule a person has to remember. This
+/// project once reached the raster decoding crate `image` transitively,
+/// through `imageproc`'s own re-export, before the labelling algorithm
+/// `imageproc` provided was brought in-house; this list is also this
+/// project's own record of that mistake, so it cannot recur unnoticed.
+const DENIED_DEPENDENCY_CRATES: &[&str] = &[
+    // Graphics and GPU.
+    "wgpu",
+    "wgpu-core",
+    "wgpu-hal",
+    "slint",
+    "vulkano",
+    "ash",
+    "gfx-hal",
+    "glow",
+    "metal",
+    "glutin",
+    "gl",
+    "skia-safe",
+    // Raster and other format decoding.
+    "image",
+    "imageproc",
+    "image-webp",
+    "png",
+    "gif",
+    "jpeg-decoder",
+    "zune-jpeg",
+    "webp",
+    "tiff",
+];
 
 /// Return every `.rs` file under `dir`, recursively, sorted so this
 /// test's own file walk visits files in the same order on every run and
@@ -390,4 +436,61 @@ fn the_colour_crate_declares_no_default_features_and_the_pure_rust_maths_feature
             );
         }
     }
+}
+
+/// The crate name a `cargo tree` output line names, skipping the
+/// tree-drawing characters and indentation `cargo tree` prints before it.
+fn crate_name_in_tree_line(line: &str) -> &str {
+    let start = line
+        .find(|c: char| c.is_ascii_alphanumeric())
+        .unwrap_or(line.len());
+    line[start..].split_whitespace().next().unwrap_or("")
+}
+
+#[test]
+fn no_gpu_or_format_crate_enters_chrys_cores_dependency_graph() {
+    let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
+    let invocation = Command::new(&cargo)
+        .args(["tree", "-p", "chrys-core", "-e", "normal"])
+        .current_dir(workspace_root())
+        .output();
+
+    let output = match invocation {
+        Ok(output) => output,
+        Err(err) => panic!(
+            "the dependency guard needs `cargo tree` to read chrys-core's \
+             own dependency graph, and it could not be run ({err}). This \
+             guard fails rather than skips: a guard that skips when its \
+             own command is missing is a guard that always passes."
+        ),
+    };
+
+    assert!(
+        output.status.success(),
+        "`cargo tree -p chrys-core -e normal` exited with {}, so the \
+         dependency guard cannot read the graph it is meant to check. \
+         Failing, not skipping: stderr was:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let tree = String::from_utf8_lossy(&output.stdout);
+    let mut offenders: Vec<&str> = tree
+        .lines()
+        .map(crate_name_in_tree_line)
+        .filter(|name| DENIED_DEPENDENCY_CRATES.contains(name))
+        .collect();
+    offenders.sort_unstable();
+    offenders.dedup();
+
+    assert!(
+        offenders.is_empty(),
+        "chrys-core's own dependency graph names a crate this project \
+         bans (no GPU crate, no format-decoding crate; see this test \
+         file's own DENIED_DEPENDENCY_CRATES doc comment). Offending \
+         crate(s): {}. The tree below shows the path that pulled each \
+         one in:\n{}",
+        offenders.join(", "),
+        tree
+    );
 }
