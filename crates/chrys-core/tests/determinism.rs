@@ -541,6 +541,135 @@ fn find_substring_occurrences(stripped: &str, needle: &str) -> Vec<usize> {
     hits
 }
 
+/// The comparison pipeline's own entry points, named exactly as the
+/// `pub use` lines of `crates/chrys-core/src/register/mod.rs` and
+/// `crates/chrys-core/src/classify/mod.rs` name them: the registration
+/// call the pipeline opens with, the peak index, the confidence
+/// assessment, the block match, the antialiasing suppression, and the
+/// region labelling. Each entry carries a trailing `(` so a search below
+/// matches a call, not a mention of the bare identifier in prose that
+/// `strip_comments_and_strings` missed, or an unrelated field of the same
+/// name.
+const COMPARISON_PIPELINE_ENTRY_POINTS: &[&str] = &[
+    "phase_correlate(",
+    "peak_index(",
+    "assess_peak(",
+    "block_match(",
+    "suppress_antialiasing(",
+    "label_regions(",
+];
+
+/// The one file that owns the comparison pipeline. Guarded fact one below
+/// requires every entry point to appear here; guarded fact two excludes
+/// this file (and no other) from the elsewhere-count.
+const PIPELINE_OWNER: &str = "sequence.rs";
+
+/// A second copy of the pipeline is unmistakable at four or more of the
+/// six entry points in one file outside the module that owns it.
+/// `crates/chrys-core/src/residual.rs` legitimately calls two of them
+/// (`phase_correlate` and `block_match`, read directly from this
+/// repository's own source before this constant was set): it runs its own
+/// registration to build the residual buffer the digest report renders,
+/// and that is existing, correct code this guard must not call a defect.
+/// Four sits above that measured count with a full entry point of margin,
+/// so it flags a real second pipeline without flagging `residual.rs`.
+const SECOND_PIPELINE_THRESHOLD: usize = 4;
+
+#[test]
+fn the_engine_has_one_comparison_pipeline_and_compare_delegates_to_it() {
+    let sequence_path = src_dir().join(PIPELINE_OWNER);
+    let sequence_source = fs::read_to_string(&sequence_path)
+        .unwrap_or_else(|err| panic!("cannot read {}: {err}", sequence_path.display()));
+    let sequence_stripped = strip_comments_and_strings(&sequence_source);
+
+    // First: sequence.rs holds every one of the six entry points. A guard
+    // that only bans copies elsewhere would stay green if the original
+    // pipeline were gutted.
+    let missing_from_owner: Vec<&str> = COMPARISON_PIPELINE_ENTRY_POINTS
+        .iter()
+        .copied()
+        .filter(|entry| find_substring_occurrences(&sequence_stripped, entry).is_empty())
+        .collect();
+    assert!(
+        missing_from_owner.is_empty(),
+        "{} no longer holds every entry point of the comparison pipeline. \
+         Missing: {}. The sequence is the only unit; if the pipeline moved, \
+         update PIPELINE_OWNER, and if it was deleted, restore it.",
+        sequence_path.display(),
+        missing_from_owner.join(", ")
+    );
+
+    // Second: no other engine file holds four or more of the six, outside
+    // the modules that define these symbols (`register/` and `classify/`
+    // implement them; calling their own definitions is not a second
+    // pipeline).
+    let mut second_pipeline_offenders: Vec<(PathBuf, Vec<&str>)> = Vec::new();
+    for file in rust_files_under(&src_dir()) {
+        if file == sequence_path {
+            continue;
+        }
+        if file.strip_prefix(src_dir().join("register")).is_ok()
+            || file.strip_prefix(src_dir().join("classify")).is_ok()
+        {
+            continue;
+        }
+        let source = fs::read_to_string(&file)
+            .unwrap_or_else(|err| panic!("cannot read {}: {err}", file.display()));
+        let stripped = strip_comments_and_strings(&source);
+        let held: Vec<&str> = COMPARISON_PIPELINE_ENTRY_POINTS
+            .iter()
+            .copied()
+            .filter(|entry| !find_substring_occurrences(&stripped, entry).is_empty())
+            .collect();
+        if held.len() >= SECOND_PIPELINE_THRESHOLD {
+            second_pipeline_offenders.push((file, held));
+        }
+    }
+    assert!(
+        second_pipeline_offenders.is_empty(),
+        "a second copy of the comparison pipeline's call chain has grown \
+         outside {}, the file that owns it. A file at or above {} of the \
+         six entry points is treated as a second pipeline; `residual.rs` \
+         legitimately holds two and must stay below this line. Offending \
+         file(s):\n{}",
+        PIPELINE_OWNER,
+        SECOND_PIPELINE_THRESHOLD,
+        second_pipeline_offenders
+            .iter()
+            .map(|(file, held)| format!("{}: {}", file.display(), held.join(", ")))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+
+    // Third: lib.rs delegates to compare_sequence and regrows none of the
+    // six entry points in the crate root.
+    let lib_path = src_dir().join("lib.rs");
+    let lib_source = fs::read_to_string(&lib_path)
+        .unwrap_or_else(|err| panic!("cannot read {}: {err}", lib_path.display()));
+    let lib_stripped = strip_comments_and_strings(&lib_source);
+
+    let delegates = !find_substring_occurrences(&lib_stripped, "compare_sequence(").is_empty();
+    let regrown: Vec<&str> = COMPARISON_PIPELINE_ENTRY_POINTS
+        .iter()
+        .copied()
+        .filter(|entry| !find_substring_occurrences(&lib_stripped, entry).is_empty())
+        .collect();
+
+    assert!(
+        delegates && regrown.is_empty(),
+        "{}: `compare` must delegate to `compare_sequence` and must not \
+         regrow the pipeline in the crate root. delegates to \
+         compare_sequence: {delegates}; entry points regrown here: {}. The \
+         sequence is the only unit, and compare is its wrapper.",
+        lib_path.display(),
+        if regrown.is_empty() {
+            "none".to_string()
+        } else {
+            regrown.join(", ")
+        }
+    );
+}
+
 #[test]
 fn the_comparison_path_never_constructs_the_auto_dispatching_fft_planner() {
     let mut hits: Vec<(PathBuf, usize)> = Vec::new();
