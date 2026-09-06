@@ -127,7 +127,33 @@ cross-architecture evidence that can be measured on one machine today.
   3. The animation adapter is added with no change to any file in the comparison engine.
   4. An input source supplies a named region as a hint, and the engine registers inside that region instead of searching for it.
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 02-01-PLAN.md — The sequence becomes the only unit, and one numbered frame sequence pair compares end to end
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 02-02-PLAN.md — Guard the one comparison pipeline, commit phase 1's four digests, and hash a sequence
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 02-03-PLAN.md — GIF, APNG and lossless animated WebP, added with no change to any engine file
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 02-04-PLAN.md — Drill the engine boundary check, then extend the six-runner matrix to the new fixtures
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 02-05-PLAN.md — A named region supplied by the source, compared inside, with the engine unchanged
+
+**Note**: the waves are ordered by one constraint. Wave 1 and Wave 2 may
+change `crates/chrys-core/`, because that is where the generic pairing lands.
+Wave 3 onward may not, and Wave 4 measures that over Wave 3's own commit
+range after proving the measurement can fail.
 
 ### Phase 3: Baseline, rules and CI gate
 
@@ -229,7 +255,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Raster engine and determinism proof | 8/8 | In Progress|  |
-| 2. Source trait and a second format | 0/TBD | Not started | - |
+| 2. Source trait and a second format | 0/5 | Not started | - |
 | 3. Baseline, rules and CI gate | 0/TBD | Not started | - |
 | 4. SVG rasterization | 0/TBD | Not started | - |
 | 5. PDF page comparison | 0/TBD | Not started | - |
