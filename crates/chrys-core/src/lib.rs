@@ -44,10 +44,11 @@ pub enum CompareError {
 /// any classification work runs on it, because CORE-06 and CORE-07
 /// require the engine to say it cannot register a pair rather than guess
 /// at one. When the pair clears that test, `compare` runs the local block
-/// match and groups the resulting `ResidualField` into labelled regions,
-/// so a pair whose content moved is not reported as changed everywhere
-/// just because it was not compared in place, and so two separate changed
-/// areas are reported as two regions rather than one that spans both.
+/// match, drops any residual pixel that is only antialiasing, and groups
+/// what remains into labelled regions, so a pair whose content moved is
+/// not reported as changed everywhere just because it was not compared in
+/// place, and so two separate changed areas are reported as two regions
+/// rather than one that spans both.
 ///
 /// Every labelled region is still reported with kind
 /// `ChangeKind::Recoloured` here; plan 01-07's Task 3 replaces that
@@ -86,7 +87,8 @@ pub fn compare(base: &Frame, candidate: &Frame) -> Result<Verdict, CompareError>
         });
     }
 
-    let field = register::block_match(base, candidate, refined.whole)?;
+    let mut field = register::block_match(base, candidate, refined.whole)?;
+    classify::suppress_antialiasing(&mut field, base, candidate);
     let labelled_regions = classify::label_regions(&field);
 
     if labelled_regions.is_empty() {

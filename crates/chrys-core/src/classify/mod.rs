@@ -5,6 +5,8 @@
 //! through a pure-Rust colour space, and names every remaining region by
 //! kind. Every child module owns exactly one of those steps.
 
+pub mod antialias;
 pub mod label;
 
+pub use antialias::{is_antialiasing, suppress_antialiasing};
 pub use label::{LabelledRegion, RESIDUAL_THRESHOLD, label_regions};
