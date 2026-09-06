@@ -132,17 +132,56 @@ release. See ROADMAP.md for the order.
 
 ## Traceability
 
-Filled during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (pending roadmap) | | |
+| CORE-01 | Phase 1 | Pending |
+| CORE-02 | Phase 1 | Pending |
+| CORE-03 | Phase 1 | Pending |
+| CORE-04 | Phase 1 | Pending |
+| CORE-05 | Phase 1 | Pending |
+| CORE-06 | Phase 1 | Pending |
+| CORE-07 | Phase 1 | Pending |
+| DET-01 | Phase 1 | Pending |
+| DET-02 | Phase 1 | Pending |
+| DET-03 | Phase 1 | Pending |
+| DET-04 | Phase 1 | Pending |
+| DET-06 | Phase 1 | Pending |
+| SRC-01 | Phase 1 | Pending |
+| SRC-02 | Phase 2 | Pending |
+| SRC-03 | Phase 2 | Pending |
+| SRC-08 | Phase 2 | Pending |
+| SRC-09 | Phase 2 | Pending |
+| RULE-01 | Phase 3 | Pending |
+| RULE-02 | Phase 3 | Pending |
+| RULE-03 | Phase 3 | Pending |
+| RULE-04 | Phase 3 | Pending |
+| RULE-05 | Phase 3 | Pending |
+| BASE-01 | Phase 3 | Pending |
+| BASE-02 | Phase 3 | Pending |
+| BASE-03 | Phase 3 | Pending |
+| BASE-04 | Phase 3 | Pending |
+| CLI-01 | Phase 3 | Pending |
+| CLI-02 | Phase 3 | Pending |
+| CLI-03 | Phase 3 | Pending |
+| CLI-04 | Phase 3 | Pending |
+| SRC-04 | Phase 4 | Pending |
+| DET-05 | Phase 4 | Pending |
+| SRC-05 | Phase 5 | Pending |
+| VIEW-01 | Phase 6 | Pending |
+| VIEW-02 | Phase 6 | Pending |
+| VIEW-03 | Phase 6 | Pending |
+| VIEW-04 | Phase 6 | Pending |
+| GPU-01 | Phase 6 | Pending |
+| GPU-02 | Phase 6 | Pending |
+| GPU-03 | Phase 6 | Pending |
+| SRC-06 | Phase 7 | Pending |
+| SRC-07 | Phase 8 | Pending |
 
 **Coverage:**
 - v1 requirements: 42 total
-- Mapped to phases: 0
-- Unmapped: 42
+- Mapped to phases: 42
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-09-06*
-*Last updated: 2026-09-06 after initialization*
+*Last updated: 2026-09-06 after roadmap creation*
