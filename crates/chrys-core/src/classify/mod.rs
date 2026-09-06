@@ -6,7 +6,11 @@
 //! kind. Every child module owns exactly one of those steps.
 
 pub mod antialias;
+pub mod colour;
+pub mod kind;
 pub mod label;
 
 pub use antialias::{is_antialiasing, suppress_antialiasing};
+pub use colour::colour_delta;
+pub use kind::classify_kind;
 pub use label::{LabelledRegion, RESIDUAL_THRESHOLD, label_regions};

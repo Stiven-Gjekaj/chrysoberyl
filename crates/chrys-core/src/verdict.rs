@@ -30,9 +30,11 @@ impl fmt::Display for BoundingBox {
 /// The colour difference between a base pixel and a candidate pixel.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ColourDelta {
-    /// The distance between the two colours. Phase 1 reports the
-    /// Euclidean distance in straight RGB as a stand-in metric; plan
-    /// 01-07 routes this through `palette`'s Lab colour space instead.
+    /// The distance between the two colours: the Euclidean distance in
+    /// `palette`'s Lab colour space, routed through the crate's `libm`
+    /// feature so every transcendental this conversion needs is pure
+    /// Rust. See `classify::colour::colour_delta`'s own doc comment for
+    /// why this formula and not CIEDE2000.
     pub delta_e: f32,
     /// The base colour, RGBA8.
     pub base: [u8; 4],
@@ -76,6 +78,9 @@ pub struct Region {
 impl fmt::Display for Region {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?} region at {}", self.kind, self.bbox)?;
+        if let Some((dx, dy)) = self.offset_px {
+            write!(f, ", moved by ({dx}, {dy})")?;
+        }
         if let Some(delta) = &self.colour_delta {
             write!(
                 f,

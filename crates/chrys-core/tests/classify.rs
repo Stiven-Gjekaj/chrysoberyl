@@ -9,11 +9,12 @@
 //! never by loading a fixture, so a red test names the shape that broke
 //! it.
 
-use chrys_core::BoundingBox;
 use chrys_core::classify::{
-    RESIDUAL_THRESHOLD, is_antialiasing, label_regions, suppress_antialiasing,
+    LabelledRegion, RESIDUAL_THRESHOLD, classify_kind, colour_delta, is_antialiasing,
+    label_regions, suppress_antialiasing,
 };
-use chrys_core::register::ResidualField;
+use chrys_core::register::{BlockOffset, ResidualField};
+use chrys_core::{BoundingBox, ChangeKind, Region};
 use chrys_source::Frame;
 
 fn empty_residual(width: usize, height: usize) -> ResidualField {
@@ -307,4 +308,168 @@ fn suppress_antialiasing_keeps_a_real_recoloured_blocks_region() {
             height: 6,
         }
     );
+}
+
+fn solid_colour_frame(width: u32, height: u32, colour: [u8; 4]) -> Frame {
+    let mut pixels = Vec::with_capacity((width * height * 4) as usize);
+    for _ in 0..(width * height) {
+        pixels.extend_from_slice(&colour);
+    }
+    frame_from(width, height, pixels)
+}
+
+fn paint_rect_colour(
+    pixels: &mut [u8],
+    stride: u32,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+    colour: [u8; 4],
+) {
+    for row in y..y + height {
+        for col in x..x + width {
+            let idx = ((row * stride + col) * 4) as usize;
+            pixels[idx..idx + 4].copy_from_slice(&colour);
+        }
+    }
+}
+
+fn region_at(x: u32, y: u32, width: u32, height: u32) -> LabelledRegion {
+    LabelledRegion {
+        bbox: BoundingBox {
+            x,
+            y,
+            width,
+            height,
+        },
+        pixel_count: (width * height) as usize,
+        label: 1,
+    }
+}
+
+const KIND_BG: [u8; 4] = [50, 50, 50, 255];
+const KIND_FG: [u8; 4] = [200, 50, 50, 255];
+
+#[test]
+fn colour_delta_on_two_identical_colours_returns_a_zero_difference_and_both_colours_unchanged() {
+    let colour = [120, 60, 200, 255];
+    let delta = colour_delta(colour, colour);
+    assert_eq!(delta.delta_e, 0.0);
+    assert_eq!(delta.base, colour);
+    assert_eq!(delta.candidate, colour);
+}
+
+#[test]
+fn colour_delta_on_two_different_colours_returns_the_same_number_on_two_runs() {
+    let base = [10, 200, 10, 255];
+    let candidate = [240, 240, 240, 255];
+    let first = colour_delta(base, candidate);
+    let second = colour_delta(base, candidate);
+    assert_eq!(first.delta_e, second.delta_e);
+    assert!(first.delta_e > 0.0);
+    assert_eq!(first.base, base);
+    assert_eq!(first.candidate, candidate);
+}
+
+#[test]
+fn colour_delta_reports_a_positive_difference_for_a_real_colour_change() {
+    let delta = colour_delta([0, 0, 0, 255], [255, 255, 255, 255]);
+    assert!(delta.delta_e > 0.0);
+}
+
+#[test]
+fn classify_kind_on_a_region_background_in_the_base_and_content_in_the_candidate_returns_added() {
+    let base = solid_colour_frame(20, 20, KIND_BG);
+    let mut candidate_pixels = base.pixels.clone();
+    paint_rect_colour(&mut candidate_pixels, 20, 5, 5, 10, 10, KIND_FG);
+    let candidate = frame_from(20, 20, candidate_pixels);
+    let region = region_at(5, 5, 10, 10);
+    let (kind, offset, delta) = classify_kind(&region, &base, &candidate, &[]);
+    assert_eq!(kind, ChangeKind::Added);
+    assert_eq!(offset, None);
+    assert_eq!(delta, None);
+}
+
+#[test]
+fn classify_kind_on_a_region_background_in_the_candidate_and_content_in_the_base_returns_removed() {
+    let candidate = solid_colour_frame(20, 20, KIND_BG);
+    let mut base_pixels = candidate.pixels.clone();
+    paint_rect_colour(&mut base_pixels, 20, 5, 5, 10, 10, KIND_FG);
+    let base = frame_from(20, 20, base_pixels);
+    let region = region_at(5, 5, 10, 10);
+    let (kind, offset, delta) = classify_kind(&region, &base, &candidate, &[]);
+    assert_eq!(kind, ChangeKind::Removed);
+    assert_eq!(offset, None);
+    assert_eq!(delta, None);
+}
+
+#[test]
+fn classify_kind_on_a_region_whose_majority_block_offset_is_non_zero_returns_moved_with_the_offset()
+{
+    let mut base = solid_colour_frame(64, 64, KIND_BG);
+    paint_rect_colour(&mut base.pixels, 64, 0, 0, 10, 10, KIND_FG);
+    let candidate = base.clone();
+    let region = region_at(0, 0, 10, 10);
+    let blocks = [BlockOffset {
+        block_x: 0,
+        block_y: 0,
+        dx: 4,
+        dy: 0,
+        score: 0,
+    }];
+    let (kind, offset, delta) = classify_kind(&region, &base, &candidate, &blocks);
+    assert_eq!(kind, ChangeKind::Moved);
+    assert_eq!(offset, Some((4, 0)));
+    assert_eq!(delta, None);
+}
+
+#[test]
+fn classify_kind_on_a_region_whose_content_count_changed_by_more_than_the_fraction_returns_resized()
+{
+    let mut base = solid_colour_frame(20, 20, KIND_BG);
+    paint_rect_colour(&mut base.pixels, 20, 5, 5, 10, 6, KIND_FG);
+    let mut candidate = solid_colour_frame(20, 20, KIND_BG);
+    paint_rect_colour(&mut candidate.pixels, 20, 5, 5, 10, 9, KIND_FG);
+    let region = region_at(5, 5, 10, 10);
+    let (kind, offset, delta) = classify_kind(&region, &base, &candidate, &[]);
+    assert_eq!(kind, ChangeKind::Resized);
+    assert_eq!(offset, None);
+    assert_eq!(delta, None);
+}
+
+#[test]
+fn classify_kind_falls_through_to_recoloured_and_always_carries_a_colour_delta() {
+    let mut base = solid_colour_frame(20, 20, KIND_BG);
+    paint_rect_colour(&mut base.pixels, 20, 5, 5, 10, 10, [240, 240, 240, 255]);
+    let mut candidate = solid_colour_frame(20, 20, KIND_BG);
+    paint_rect_colour(&mut candidate.pixels, 20, 5, 5, 10, 10, [10, 200, 10, 255]);
+    let region = region_at(5, 5, 10, 10);
+    let (kind, offset, delta) = classify_kind(&region, &base, &candidate, &[]);
+    assert_eq!(kind, ChangeKind::Recoloured);
+    assert_eq!(offset, None);
+    let delta = delta.expect("a recoloured region always carries a colour delta");
+    assert_eq!(delta.base, [240, 240, 240, 255]);
+    assert_eq!(delta.candidate, [10, 200, 10, 255]);
+    assert!(delta.delta_e > 0.0);
+}
+
+#[test]
+fn a_moved_regions_display_names_the_kind_the_bounding_box_and_the_offset_never_a_bare_pixel_count()
+{
+    let region = Region {
+        kind: ChangeKind::Moved,
+        bbox: BoundingBox {
+            x: 4,
+            y: 4,
+            width: 8,
+            height: 8,
+        },
+        offset_px: Some((4, -2)),
+        colour_delta: None,
+    };
+    let text = region.to_string();
+    assert!(text.contains("Moved"));
+    assert!(text.contains("(4, -2)"));
+    assert!(!text.trim().chars().all(|c| c.is_ascii_digit()));
 }

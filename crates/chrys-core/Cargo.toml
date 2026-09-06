@@ -21,6 +21,17 @@ libm.workspace = true
 # organisation as the source repository. That direct evidence is the
 # disposition; the stale cache is not. See 01-RESEARCH.md.
 imageproc.workspace = true
+# DET-06's colour-path mitigation: Lab conversion needs a cube root
+# whatever colour-difference formula sits above it, and the standard
+# library's cube root is documented as varying by platform, by Rust
+# version, and even between two calls in one execution. `libm` routes
+# every colour transcendental through pure Rust instead. The two smaller
+# colour-difference crates the research probed and rejected on a
+# suspicious download-volume verdict, with no documented pure-Rust
+# transcendental route, are named in 01-RESEARCH.md's Alternatives
+# Considered table, not here: a grep gate over this file keeps them out
+# of the manifest, and naming them here would defeat that gate.
+palette.workspace = true
 
 # Test-only. `chrys-core` itself still names no format crate; this decodes
 # the committed refusal corpus in `tests/refusal.rs` only, the same way

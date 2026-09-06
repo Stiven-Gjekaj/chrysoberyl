@@ -50,13 +50,10 @@ pub enum CompareError {
 /// place, and so two separate changed areas are reported as two regions
 /// rather than one that spans both.
 ///
-/// Every labelled region is still reported with kind
-/// `ChangeKind::Recoloured` here; plan 01-07's Task 3 replaces that
-/// placeholder with the ordered decision list every region actually reads
-/// through. The `delta_e` this function reports is likewise a stand-in
-/// metric: it is the Euclidean distance in straight RGB, not a perceptual
-/// colour distance, until that same task routes colour difference through
-/// `palette`'s Lab colour space.
+/// Each region's kind, its offset when it moved, and its colour delta
+/// when it was recoloured, all come from `classify::classify_kind`'s own
+/// ordered decision list; see that function's own doc comment for the
+/// five named rules it applies in order.
 pub fn compare(base: &Frame, candidate: &Frame) -> Result<Verdict, CompareError> {
     if base.pixel_count() == 0 || candidate.pixel_count() == 0 {
         return Err(CompareError::EmptyFrame);
@@ -95,54 +92,21 @@ pub fn compare(base: &Frame, candidate: &Frame) -> Result<Verdict, CompareError>
         return Ok(Verdict::Identical);
     }
 
-    let base_pixels = base.rgba8();
-    let candidate_pixels = candidate.rgba8();
-    let width = base.width;
-
     let regions = labelled_regions
         .into_iter()
         .map(|labelled| {
-            let idx = ((labelled.bbox.y * width + labelled.bbox.x) * 4) as usize;
-            let base_rgba = [
-                base_pixels[idx],
-                base_pixels[idx + 1],
-                base_pixels[idx + 2],
-                base_pixels[idx + 3],
-            ];
-            let candidate_rgba = [
-                candidate_pixels[idx],
-                candidate_pixels[idx + 1],
-                candidate_pixels[idx + 2],
-                candidate_pixels[idx + 3],
-            ];
-            let delta_e = euclidean_rgb_distance(base_rgba, candidate_rgba);
-
+            let (kind, offset_px, colour_delta) =
+                classify::classify_kind(&labelled, base, candidate, &field.blocks);
             Region {
-                kind: ChangeKind::Recoloured,
+                kind,
                 bbox: labelled.bbox,
-                offset_px: None,
-                colour_delta: Some(ColourDelta {
-                    delta_e,
-                    base: base_rgba,
-                    candidate: candidate_rgba,
-                }),
+                offset_px,
+                colour_delta,
             }
         })
         .collect();
 
     Ok(Verdict::Changed { regions })
-}
-
-/// The Euclidean distance between two RGBA8 colours, in straight RGB. This
-/// is a stand-in for a perceptual colour-difference formula; see the doc
-/// comment on `compare`.
-fn euclidean_rgb_distance(base: [u8; 4], candidate: [u8; 4]) -> f32 {
-    let mut sum_of_squares = 0.0f32;
-    for channel in 0..3 {
-        let diff = f32::from(base[channel]) - f32::from(candidate[channel]);
-        sum_of_squares += diff * diff;
-    }
-    sum_of_squares.sqrt()
 }
 
 #[cfg(test)]
@@ -263,6 +227,11 @@ mod tests {
         // in place, so the recoloured block's own true, zero offset stays
         // the only good answer.
         paint_rect(&mut base.pixels, width, 72, 72, 112, 112, [0, 0, 0, 255]);
+        // A mid-grey distinct from the frame's own background: a region
+        // whose base colour already equals the frame's modal colour is
+        // background by classify_kind's own rule, and would report
+        // `Added`, not `Recoloured`. This rectangle must already be
+        // content, not background, for the test to name what it claims.
         paint_rect(
             &mut base.pixels,
             width,
@@ -270,7 +239,7 @@ mod tests {
             96,
             64,
             64,
-            [240, 240, 240, 255],
+            [180, 180, 180, 255],
         );
         let mut candidate = base.clone();
 
@@ -302,7 +271,7 @@ mod tests {
                     }
                 );
                 let delta = region.colour_delta.as_ref().expect("colour delta present");
-                assert_eq!(delta.base, [240, 240, 240, 255]);
+                assert_eq!(delta.base, [180, 180, 180, 255]);
                 assert_eq!(delta.candidate, [10, 200, 10, 255]);
             }
             other => panic!("expected exactly one changed region, got {other:?}"),
