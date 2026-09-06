@@ -14,13 +14,6 @@ thiserror.workspace = true
 sha2.workspace = true
 rustfft.workspace = true
 libm.workspace = true
-# `imageproc`'s own package-legitimacy check returned a stale suspicious
-# verdict (a registry-lookup failure inside that tool). A direct
-# `crates.io/api/v1/crates/imageproc` query the same session returned clean
-# metadata: a 2016 registry age, 12.7 million downloads, and the image-rs
-# organisation as the source repository. That direct evidence is the
-# disposition; the stale cache is not. See 01-RESEARCH.md.
-imageproc.workspace = true
 # DET-06's colour-path mitigation: Lab conversion needs a cube root
 # whatever colour-difference formula sits above it, and the standard
 # library's cube root is documented as varying by platform, by Rust
