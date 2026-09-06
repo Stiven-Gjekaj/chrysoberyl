@@ -136,6 +136,60 @@ mod tests {
         }
     }
 
+    fn paint_rect(
+        pixels: &mut [u8],
+        stride: u32,
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
+        colour: [u8; 4],
+    ) {
+        for row in y..y + height {
+            for col in x..x + width {
+                let idx = ((row * stride + col) * 4) as usize;
+                pixels[idx..idx + 4].copy_from_slice(&colour);
+            }
+        }
+    }
+
+    /// A frame with four anchor rectangles, so phase correlation has real
+    /// edges to lock onto. A flat frame gives registration almost no
+    /// structure, and reads as unregisterable even on a pair a person
+    /// would call the same picture with one patch touched up.
+    fn frame_with_anchor_rects(width: u32, height: u32, background: [u8; 4]) -> Frame {
+        let mut frame = solid_frame(width, height, background);
+        paint_rect(&mut frame.pixels, width, 4, 4, 80, 60, [200, 40, 40, 255]);
+        paint_rect(
+            &mut frame.pixels,
+            width,
+            width - 90,
+            4,
+            80,
+            50,
+            [40, 160, 40, 255],
+        );
+        paint_rect(
+            &mut frame.pixels,
+            width,
+            4,
+            height - 80,
+            60,
+            70,
+            [40, 40, 200, 255],
+        );
+        paint_rect(
+            &mut frame.pixels,
+            width,
+            width - 90,
+            height - 90,
+            70,
+            80,
+            [200, 40, 200, 255],
+        );
+        frame
+    }
+
     #[test]
     fn empty_sequence_refuses_with_a_single_verdict_naming_no_frame() {
         let base: Vec<Frame> = Vec::new();
@@ -178,5 +232,127 @@ mod tests {
             }
             other => panic!("expected a frame-count-mismatch refusal, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn one_index_refusing_on_size_leaves_other_indices_reporting_their_own_verdict() {
+        let width = 128;
+        let height = 128;
+        let background = [240, 240, 240, 255];
+
+        let base = vec![
+            frame_with_anchor_rects(width, height, background),
+            frame_with_anchor_rects(width, height, background),
+            frame_with_anchor_rects(width, height, background),
+        ];
+        let mut candidate = base.clone();
+        // Index 1 gets a different width in the candidate only, so its own
+        // pair refuses on a dimension mismatch. "Compared frame by frame"
+        // means a per-frame outcome, so indices 0 and 2 must still report
+        // their own verdict rather than the whole sequence refusing.
+        candidate[1] = frame_with_anchor_rects(width + 8, height, background);
+
+        let result = compare_sequence(&base, &candidate).unwrap();
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0], Verdict::Identical);
+        match &result[1] {
+            Verdict::Refused {
+                reason: RefusalReason::DimensionMismatch { .. },
+            } => {}
+            other => panic!("expected a dimension-mismatch refusal at index 1, got {other:?}"),
+        }
+        assert_eq!(result[2], Verdict::Identical);
+    }
+
+    #[test]
+    fn a_zero_pixel_frame_inside_a_non_empty_sequence_returns_compare_error() {
+        let width = 128;
+        let height = 128;
+        let background = [240, 240, 240, 255];
+        let base = vec![
+            frame_with_anchor_rects(width, height, background),
+            Frame {
+                pixels: Vec::new(),
+                width: 0,
+                height: 0,
+                index: 1,
+                hints: Vec::new(),
+            },
+        ];
+        let candidate = vec![
+            frame_with_anchor_rects(width, height, background),
+            solid_frame(1, 1, [0, 0, 0, 255]),
+        ];
+        // A zero-pixel frame inside a non-empty sequence is a different
+        // failure from an empty sequence: this returns Err, and it must
+        // not be merged with RefusalReason::EmptySequence's Ok(Refused).
+        assert!(matches!(
+            compare_sequence(&base, &candidate),
+            Err(CompareError::EmptyFrame)
+        ));
+    }
+
+    #[test]
+    fn compare_and_compare_sequence_agree_over_identical_changed_mismatched_and_empty() {
+        let width = 128;
+        let height = 128;
+        let background = [240, 240, 240, 255];
+
+        // Identical pair.
+        let identical_base = frame_with_anchor_rects(width, height, background);
+        let identical_candidate = identical_base.clone();
+        assert_pair_agrees(&identical_base, &identical_candidate);
+
+        // Changed pair: recolour a rectangle away from the anchors.
+        let mut changed_base = frame_with_anchor_rects(width, height, background);
+        paint_rect(
+            &mut changed_base.pixels,
+            width,
+            40,
+            40,
+            30,
+            30,
+            [0, 0, 0, 255],
+        );
+        let mut changed_candidate = changed_base.clone();
+        for row in 40..70u32 {
+            for col in 40..70u32 {
+                let idx = ((row * width + col) * 4) as usize;
+                changed_candidate.pixels[idx..idx + 4].copy_from_slice(&[10, 200, 10, 255]);
+            }
+        }
+        assert_pair_agrees(&changed_base, &changed_candidate);
+
+        // Dimension-mismatched pair.
+        let mismatched_base = frame_with_anchor_rects(width, height, background);
+        let mismatched_candidate = frame_with_anchor_rects(width + 4, height, background);
+        assert_pair_agrees(&mismatched_base, &mismatched_candidate);
+
+        // Zero-pixel frame: both paths must return the same error.
+        let empty = Frame {
+            pixels: Vec::new(),
+            width: 0,
+            height: 0,
+            index: 0,
+            hints: Vec::new(),
+        };
+        let other = solid_frame(1, 1, [0, 0, 0, 255]);
+        let direct = crate::compare(&empty, &other);
+        let via_sequence =
+            compare_sequence(std::slice::from_ref(&empty), std::slice::from_ref(&other));
+        assert!(matches!(direct, Err(CompareError::EmptyFrame)));
+        assert!(matches!(via_sequence, Err(CompareError::EmptyFrame)));
+    }
+
+    /// Assert that `crate::compare` and `compare_sequence` over a slice of
+    /// one report the same outcome for `base` and `candidate`. This is the
+    /// test that stops the two paths from drifting apart later: `compare`
+    /// is a wrapper, not a second implementation.
+    fn assert_pair_agrees(base: &Frame, candidate: &Frame) {
+        let direct = crate::compare(base, candidate).unwrap();
+        let via_sequence =
+            compare_sequence(std::slice::from_ref(base), std::slice::from_ref(candidate)).unwrap();
+        assert_eq!(via_sequence.len(), 1);
+        assert_eq!(direct, via_sequence[0]);
     }
 }
