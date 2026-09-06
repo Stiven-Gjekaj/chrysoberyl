@@ -69,3 +69,51 @@ fn a_second_run_gives_byte_identical_stdout() {
     let second = run_hash_only();
     assert_eq!(first, second);
 }
+
+/// The names of the four digest lines, in the order
+/// `crates/chrys-core/src/hash.rs`'s `DigestSet` prints them, so a
+/// mismatch below can name which of the four meanings moved rather than
+/// only that two strings differ.
+const DIGEST_LINE_NAMES: [&str; 4] = ["decode-base", "decode-candidate", "residual", "verdict"];
+
+#[test]
+fn the_four_digests_match_the_committed_digest_file() {
+    let live = run_hash_only();
+    let live_lines: Vec<&str> = live.lines().collect();
+    assert_eq!(
+        live_lines.len(),
+        4,
+        "the live report has exactly four lines"
+    );
+
+    let committed_path = repo_root().join("tests/golden/pair-01/expected-digest.sha256");
+    let committed = std::fs::read_to_string(&committed_path)
+        .unwrap_or_else(|error| panic!("reading {}: {error}", committed_path.display()));
+    // A leading `#` line is this fixture's own header comment, read by a
+    // person, and is not one of the four digest lines this test compares.
+    let committed_lines: Vec<&str> = committed
+        .lines()
+        .map(str::trim_end) // normalise a Windows checkout's trailing \r
+        .filter(|line| !line.starts_with('#') && !line.is_empty())
+        .collect();
+    assert_eq!(
+        committed_lines.len(),
+        4,
+        "the committed file holds four non-comment lines"
+    );
+
+    let mut moved: Vec<&str> = Vec::new();
+    for (index, name) in DIGEST_LINE_NAMES.iter().enumerate() {
+        if live_lines[index] != committed_lines[index] {
+            moved.push(name);
+        }
+    }
+    assert!(
+        moved.is_empty(),
+        "the live digest report no longer matches tests/golden/pair-01/expected-digest.sha256. \
+         Line(s) that moved: {}.\nlive:\n{}\ncommitted:\n{}",
+        moved.join(", "),
+        live_lines.join("\n"),
+        committed_lines.join("\n")
+    );
+}
