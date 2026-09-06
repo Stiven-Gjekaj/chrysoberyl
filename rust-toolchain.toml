@@ -1,0 +1,7 @@
+# The pin below is a determinism input, not a convenience. The standard
+# library's own precision documentation states that `sin`, `cos`, `cbrt`,
+# `powf`, `exp`, `ln` and `atan2` vary by platform and by Rust version.
+[toolchain]
+channel = "1.97.1"
+profile = "minimal"
+components = ["rustfmt", "clippy"]

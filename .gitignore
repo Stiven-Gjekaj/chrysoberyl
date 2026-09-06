@@ -11,3 +11,7 @@ Notes/PAI.md
 # The research agents write a web-fetch cache here. It is machine-local and
 # it is not evidence. The research documents beside it are.
 .planning/research/.cache/
+
+# Build output. Cargo.lock is committed on purpose; see AGENTS.md.
+/target
+**/*.rs.bk
