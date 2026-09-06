@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod classify;
 pub mod hash;
 pub mod register;
 pub mod residual;
@@ -43,20 +44,18 @@ pub enum CompareError {
 /// any classification work runs on it, because CORE-06 and CORE-07
 /// require the engine to say it cannot register a pair rather than guess
 /// at one. When the pair clears that test, `compare` runs the local block
-/// match and walks the resulting `ResidualField` once, collecting the
-/// bounding box of every pixel whose residual colour bytes are non-zero,
+/// match and groups the resulting `ResidualField` into labelled regions,
 /// so a pair whose content moved is not reported as changed everywhere
-/// just because it was not compared in place.
+/// just because it was not compared in place, and so two separate changed
+/// areas are reported as two regions rather than one that spans both.
 ///
-/// The single-region bounding box this function returns is the degenerate
-/// case of connected-component labelling, which plan 01-07 replaces with
-/// `imageproc`'s labeller so that separate changed areas are reported as
-/// separate regions, and plan 01-07 is also where the `ResidualField`'s
-/// own per-block offsets and colour bytes at the bounding box's own
-/// registered position become the region's reported data. The `delta_e`
-/// this function reports is a stand-in metric: it is the Euclidean
-/// distance in straight RGB, not a perceptual colour distance, until plan
-/// 01-07 routes colour difference through `palette`'s Lab colour space.
+/// Every labelled region is still reported with kind
+/// `ChangeKind::Recoloured` here; plan 01-07's Task 3 replaces that
+/// placeholder with the ordered decision list every region actually reads
+/// through. The `delta_e` this function reports is likewise a stand-in
+/// metric: it is the Euclidean distance in straight RGB, not a perceptual
+/// colour distance, until that same task routes colour difference through
+/// `palette`'s Lab colour space.
 pub fn compare(base: &Frame, candidate: &Frame) -> Result<Verdict, CompareError> {
     if base.pixel_count() == 0 || candidate.pixel_count() == 0 {
         return Err(CompareError::EmptyFrame);
@@ -88,68 +87,48 @@ pub fn compare(base: &Frame, candidate: &Frame) -> Result<Verdict, CompareError>
     }
 
     let field = register::block_match(base, candidate, refined.whole)?;
+    let labelled_regions = classify::label_regions(&field);
+
+    if labelled_regions.is_empty() {
+        return Ok(Verdict::Identical);
+    }
 
     let base_pixels = base.rgba8();
     let candidate_pixels = candidate.rgba8();
     let width = base.width;
-    let height = base.height;
 
-    let mut min_x: Option<u32> = None;
-    let mut min_y: Option<u32> = None;
-    let mut max_x: Option<u32> = None;
-    let mut max_y: Option<u32> = None;
+    let regions = labelled_regions
+        .into_iter()
+        .map(|labelled| {
+            let idx = ((labelled.bbox.y * width + labelled.bbox.x) * 4) as usize;
+            let base_rgba = [
+                base_pixels[idx],
+                base_pixels[idx + 1],
+                base_pixels[idx + 2],
+                base_pixels[idx + 3],
+            ];
+            let candidate_rgba = [
+                candidate_pixels[idx],
+                candidate_pixels[idx + 1],
+                candidate_pixels[idx + 2],
+                candidate_pixels[idx + 3],
+            ];
+            let delta_e = euclidean_rgb_distance(base_rgba, candidate_rgba);
 
-    for y in 0..height {
-        for x in 0..width {
-            let idx = ((y * width + x) * 4) as usize;
-            if field.samples[idx..idx + 3] != [0, 0, 0] {
-                min_x = Some(min_x.map_or(x, |v| v.min(x)));
-                min_y = Some(min_y.map_or(y, |v| v.min(y)));
-                max_x = Some(max_x.map_or(x, |v| v.max(x)));
-                max_y = Some(max_y.map_or(y, |v| v.max(y)));
+            Region {
+                kind: ChangeKind::Recoloured,
+                bbox: labelled.bbox,
+                offset_px: None,
+                colour_delta: Some(ColourDelta {
+                    delta_e,
+                    base: base_rgba,
+                    candidate: candidate_rgba,
+                }),
             }
-        }
-    }
+        })
+        .collect();
 
-    let (min_x, min_y, max_x, max_y) = match (min_x, min_y, max_x, max_y) {
-        (Some(min_x), Some(min_y), Some(max_x), Some(max_y)) => (min_x, min_y, max_x, max_y),
-        _ => return Ok(Verdict::Identical),
-    };
-
-    let bbox = BoundingBox {
-        x: min_x,
-        y: min_y,
-        width: max_x - min_x + 1,
-        height: max_y - min_y + 1,
-    };
-
-    let idx = ((min_y * width + min_x) * 4) as usize;
-    let base_rgba = [
-        base_pixels[idx],
-        base_pixels[idx + 1],
-        base_pixels[idx + 2],
-        base_pixels[idx + 3],
-    ];
-    let candidate_rgba = [
-        candidate_pixels[idx],
-        candidate_pixels[idx + 1],
-        candidate_pixels[idx + 2],
-        candidate_pixels[idx + 3],
-    ];
-    let delta_e = euclidean_rgb_distance(base_rgba, candidate_rgba);
-
-    Ok(Verdict::Changed {
-        regions: vec![Region {
-            kind: ChangeKind::Recoloured,
-            bbox,
-            offset_px: None,
-            colour_delta: Some(ColourDelta {
-                delta_e,
-                base: base_rgba,
-                candidate: candidate_rgba,
-            }),
-        }],
-    })
+    Ok(Verdict::Changed { regions })
 }
 
 /// The Euclidean distance between two RGBA8 colours, in straight RGB. This
