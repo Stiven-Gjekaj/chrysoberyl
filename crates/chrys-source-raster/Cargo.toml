@@ -10,5 +10,5 @@ workspace = true
 
 [dependencies]
 chrys-source = { path = "../chrys-source" }
-image = { workspace = true, features = ["png"] }
+image = { workspace = true, features = ["png", "jpeg", "webp", "tiff"] }
 thiserror.workspace = true
