@@ -8,13 +8,17 @@
 //! number chosen by inspection.
 //!
 //! The second job, added once the threshold exists, is the refusal
-//! behaviour itself: that `compare` refuses every `should-refuse` pair and
-//! never refuses a `should-register` pair, in words and in the CLI's exit
-//! code.
+//! behaviour itself: that `compare` refuses every `should-refuse` pair,
+//! naming `RefusalReason::PeakConfidenceTooLow`, and never refuses a
+//! `should-register` pair. `crates/chrys-cli/tests/refusal.rs` covers the
+//! CLI's own exit code and wording, because `CARGO_BIN_EXE_chrys` is only
+//! set for a package that itself declares that binary target, and that
+//! package is `chrys-cli`, not `chrys-core`.
 
 use std::path::{Path, PathBuf};
 
-use chrys_core::register::{assess_peak, peak_index, phase_correlate};
+use chrys_core::register::{REFUSAL_THRESHOLD, assess_peak, peak_index, phase_correlate};
+use chrys_core::{RefusalReason, Verdict, compare};
 use chrys_source::{Frame, Source};
 use chrys_source_raster::RasterSource;
 
@@ -149,4 +153,95 @@ fn print_measured(group: &str, pairs: &[MeasuredPair]) {
     for pair in pairs {
         println!("{group}/{}: ratio {}", pair.directory, pair.ratio);
     }
+}
+
+/// List every pair directory under `group_dir`, in a fixed, sorted order.
+fn pair_dirs(group_dir: &Path) -> Vec<PathBuf> {
+    let mut entries: Vec<PathBuf> = std::fs::read_dir(group_dir)
+        .unwrap_or_else(|error| panic!("reading {}: {error}", group_dir.display()))
+        .map(|entry| entry.expect("a directory entry").path())
+        .filter(|path| path.is_dir())
+        .collect();
+    entries.sort();
+    entries
+}
+
+#[test]
+fn every_should_refuse_pair_is_refused_with_peak_confidence_too_low() {
+    for pair_dir in pair_dirs(&refuse_01_root().join("should-refuse")) {
+        let base = load_frame(&pair_dir.join("base.png"));
+        let candidate = load_frame(&pair_dir.join("candidate.png"));
+        let verdict =
+            compare(&base, &candidate).unwrap_or_else(|error| panic!("comparing: {error}"));
+        assert!(
+            matches!(
+                verdict,
+                Verdict::Refused {
+                    reason: RefusalReason::PeakConfidenceTooLow { .. }
+                }
+            ),
+            "{} expected a peak-confidence refusal, got {verdict:?}",
+            pair_dir.display()
+        );
+    }
+}
+
+#[test]
+fn no_should_register_pair_is_refused() {
+    for pair_dir in pair_dirs(&refuse_01_root().join("should-register")) {
+        let base = load_frame(&pair_dir.join("base.png"));
+        let candidate = load_frame(&pair_dir.join("candidate.png"));
+        let verdict =
+            compare(&base, &candidate).unwrap_or_else(|error| panic!("comparing: {error}"));
+        assert!(
+            !matches!(verdict, Verdict::Refused { .. }),
+            "{} was refused, expected a verdict: {verdict:?}",
+            pair_dir.display()
+        );
+    }
+}
+
+#[test]
+fn a_refusal_names_the_measured_ratio_and_the_threshold_it_failed() {
+    let pair_dir = refuse_01_root().join("should-refuse").join("pair-01");
+    let base = load_frame(&pair_dir.join("base.png"));
+    let candidate = load_frame(&pair_dir.join("candidate.png"));
+    let verdict = compare(&base, &candidate).unwrap_or_else(|error| panic!("comparing: {error}"));
+
+    match verdict {
+        Verdict::Refused {
+            reason: RefusalReason::PeakConfidenceTooLow { ratio, threshold },
+        } => {
+            assert_eq!(threshold, REFUSAL_THRESHOLD);
+            assert!(
+                ratio < threshold,
+                "the reported ratio {ratio} did not fail the reported threshold {threshold}"
+            );
+        }
+        other => panic!("expected a peak-confidence refusal, got {other:?}"),
+    }
+}
+
+#[test]
+fn two_runs_of_compare_on_the_same_should_refuse_pair_agree_exactly() {
+    let pair_dir = refuse_01_root().join("should-refuse").join("pair-06");
+    let base = load_frame(&pair_dir.join("base.png"));
+    let candidate = load_frame(&pair_dir.join("candidate.png"));
+
+    let first = compare(&base, &candidate).unwrap_or_else(|error| panic!("comparing: {error}"));
+    let second = compare(&base, &candidate).unwrap_or_else(|error| panic!("comparing: {error}"));
+    assert_eq!(first, second);
+}
+
+#[test]
+fn a_should_refuse_verdicts_display_text_names_the_pair_too_different_to_register() {
+    let pair_dir = refuse_01_root().join("should-refuse").join("pair-03");
+    let base = load_frame(&pair_dir.join("base.png"));
+    let candidate = load_frame(&pair_dir.join("candidate.png"));
+    let verdict = compare(&base, &candidate).unwrap_or_else(|error| panic!("comparing: {error}"));
+    let text = verdict.to_string();
+    assert!(
+        text.contains("too different to register"),
+        "display text did not name the refusal: {text}"
+    );
 }

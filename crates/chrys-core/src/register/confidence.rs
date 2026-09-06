@@ -104,6 +104,21 @@ fn toroidal_distance(a: usize, b: usize, resolution: usize) -> usize {
     direct.min(resolution - direct)
 }
 
+/// The ratio below which `compare` refuses a pair instead of classifying
+/// it, because CORE-06 and CORE-07 require the engine to say so, not to
+/// guess, when a pair falls outside the near-identical assumption.
+///
+/// This number came from `crates/chrys-core/tests/refusal.rs`, not from
+/// inspection. On the corpus committed under `tests/golden/refuse-01/`,
+/// the lowest `should-register` ratio measured 3041.24 and the highest
+/// `should-refuse` ratio measured 1586.52; this constant is the midpoint
+/// of those two, rounded to two decimal places. Changing this number
+/// without re-running that test against the corpus is editing a result to
+/// fit a case, not measuring one; if the corpus changes, re-run the test,
+/// read the two new bounds it prints, and update this constant and this
+/// comment together.
+pub const REFUSAL_THRESHOLD: f32 = 2313.88;
+
 #[cfg(test)]
 mod tests {
     use super::*;

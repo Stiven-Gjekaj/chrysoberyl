@@ -88,7 +88,7 @@ impl fmt::Display for Region {
 }
 
 /// The reason `compare` refused to produce a verdict.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum RefusalReason {
     /// The base and candidate frames have different dimensions. `compare`
     /// assumes near-identical pairs and does not scale or crop to make
@@ -99,6 +99,16 @@ pub enum RefusalReason {
         /// The candidate frame's width and height, in pixels.
         candidate: (u32, u32),
     },
+    /// The phase-correlation peak was not sharp enough to trust. `compare`
+    /// assumes a near-identical pair, and this pair's own registration
+    /// step could not find a peak that stands out from the rest of the
+    /// correlation surface by more than `threshold`.
+    PeakConfidenceTooLow {
+        /// The measured peak-to-floor ratio this pair scored.
+        ratio: f32,
+        /// The ratio `ratio` needed to clear, and did not.
+        threshold: f32,
+    },
 }
 
 impl fmt::Display for RefusalReason {
@@ -108,6 +118,12 @@ impl fmt::Display for RefusalReason {
                 f,
                 "dimension mismatch: base is {}x{}, candidate is {}x{}",
                 base.0, base.1, candidate.0, candidate.1
+            ),
+            RefusalReason::PeakConfidenceTooLow { ratio, threshold } => write!(
+                f,
+                "the pair is too different to register: peak confidence {ratio:.2} is \
+                 below the threshold {threshold:.2}; this engine compares near-identical \
+                 pairs only"
             ),
         }
     }
@@ -176,6 +192,18 @@ mod tests {
             }
             .is_change()
         );
+    }
+
+    #[test]
+    fn peak_confidence_too_low_prints_the_ratio_the_threshold_and_the_words_too_different() {
+        let text = RefusalReason::PeakConfidenceTooLow {
+            ratio: 12.5,
+            threshold: 2313.88,
+        }
+        .to_string();
+        assert!(text.contains("too different"));
+        assert!(text.contains("12.50"));
+        assert!(text.contains("2313.88"));
     }
 
     #[test]

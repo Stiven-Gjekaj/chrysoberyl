@@ -13,7 +13,7 @@ pub mod phase_correlation;
 pub mod subpixel;
 pub mod window;
 
-pub use confidence::{PeakConfidence, assess_peak};
+pub use confidence::{PeakConfidence, REFUSAL_THRESHOLD, assess_peak};
 pub use luma::to_luma_downsampled;
 pub use phase_correlation::{CoarseOffset, CorrelationSurface, peak_index, phase_correlate};
 pub use subpixel::{RefinedOffset, refine_peak};

@@ -33,11 +33,17 @@ pub enum CompareError {
 
 /// Compare a base frame to a candidate frame and return a verdict.
 ///
+/// The order of work is fixed: a shape check, then registration, then the
+/// confidence test that decides a refusal, and only then classification.
 /// `compare` refuses a pair whose dimensions differ, because this project
 /// assumes near-identical pairs and does not scale or crop to make an
-/// unequal pair fit. When the shapes match, `compare` walks both buffers
-/// once and collects the bounding box of every pixel whose RGBA bytes
-/// differ.
+/// unequal pair fit. When the shapes match, `compare` runs phase
+/// correlation and scores how sharply it peaks; a pair whose peak is not
+/// sharp enough to trust is refused there, before any classification work
+/// runs on it, because CORE-06 and CORE-07 require the engine to say it
+/// cannot register a pair rather than guess at one. When the pair clears
+/// that test, `compare` walks both buffers once and collects the bounding
+/// box of every pixel whose RGBA bytes differ.
 ///
 /// The single-region bounding box this function returns is the degenerate
 /// case of connected-component labelling, which plan 01-07 replaces with
@@ -56,6 +62,22 @@ pub fn compare(base: &Frame, candidate: &Frame) -> Result<Verdict, CompareError>
             reason: RefusalReason::DimensionMismatch {
                 base: (base.width, base.height),
                 candidate: (candidate.width, candidate.height),
+            },
+        });
+    }
+
+    // Refusing before classifying is the point, not an optimisation. This
+    // project's core value only holds for a near-identical pair; a pair
+    // whose registration cannot find a peak sharp enough to trust falls
+    // outside that assumption, so nothing past this point may run on it.
+    let (refined, surface) = register::phase_correlate(base, candidate)?;
+    let peak_index = register::peak_index(refined.whole, surface.resolution);
+    let confidence = register::assess_peak(&surface, peak_index);
+    if confidence.ratio < register::REFUSAL_THRESHOLD {
+        return Ok(Verdict::Refused {
+            reason: RefusalReason::PeakConfidenceTooLow {
+                ratio: confidence.ratio,
+                threshold: register::REFUSAL_THRESHOLD,
             },
         });
     }
@@ -154,6 +176,61 @@ mod tests {
         }
     }
 
+    fn paint_rect(
+        pixels: &mut [u8],
+        stride: u32,
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
+        colour: [u8; 4],
+    ) {
+        for row in y..y + height {
+            for col in x..x + width {
+                let idx = ((row * stride + col) * 4) as usize;
+                pixels[idx..idx + 4].copy_from_slice(&colour);
+            }
+        }
+    }
+
+    /// A frame with four anchor rectangles, away from the region a test
+    /// changes, so phase correlation has real edges to lock onto. A flat
+    /// frame with only the tested change gives registration almost no
+    /// structure, and reads as unregisterable even on a pair a person
+    /// would call the same picture with one patch touched up.
+    fn frame_with_anchor_rects(width: u32, height: u32, background: [u8; 4]) -> Frame {
+        let mut frame = solid_frame(width, height, background);
+        paint_rect(&mut frame.pixels, width, 4, 4, 80, 60, [200, 40, 40, 255]);
+        paint_rect(
+            &mut frame.pixels,
+            width,
+            width - 90,
+            4,
+            80,
+            50,
+            [40, 160, 40, 255],
+        );
+        paint_rect(
+            &mut frame.pixels,
+            width,
+            4,
+            height - 80,
+            60,
+            70,
+            [40, 40, 200, 255],
+        );
+        paint_rect(
+            &mut frame.pixels,
+            width,
+            width - 90,
+            height - 90,
+            70,
+            80,
+            [200, 40, 200, 255],
+        );
+        frame
+    }
+
     #[test]
     fn identical_frames_return_identical() {
         let a = solid_frame(4, 4, [10, 20, 30, 255]);
@@ -180,14 +257,18 @@ mod tests {
 
     #[test]
     fn a_recoloured_rectangle_returns_one_recoloured_region() {
-        let width = 8;
-        let height = 8;
-        let base = solid_frame(width, height, [240, 240, 240, 255]);
-        let mut candidate = solid_frame(width, height, [240, 240, 240, 255]);
+        let width = 256;
+        let height = 256;
+        let base = frame_with_anchor_rects(width, height, [240, 240, 240, 255]);
+        let mut candidate = base.clone();
 
-        // Recolour a 2x2 rectangle at (3, 3) in the candidate only.
-        for y in 3..5u32 {
-            for x in 3..5u32 {
+        // Recolour a 64x64 rectangle at (96, 96) in the candidate only.
+        // The anchor rectangles `frame_with_anchor_rects` paints stay
+        // identical in both frames, so registration has structure to
+        // register this near-identical pair with confidence, before
+        // classification ever sees it.
+        for y in 96..160u32 {
+            for x in 96..160u32 {
                 let idx = ((y * width + x) * 4) as usize;
                 candidate.pixels[idx..idx + 4].copy_from_slice(&[10, 200, 10, 255]);
             }
@@ -202,10 +283,10 @@ mod tests {
                 assert_eq!(
                     region.bbox,
                     BoundingBox {
-                        x: 3,
-                        y: 3,
-                        width: 2,
-                        height: 2
+                        x: 96,
+                        y: 96,
+                        width: 64,
+                        height: 64
                     }
                 );
                 let delta = region.colour_delta.as_ref().expect("colour delta present");
