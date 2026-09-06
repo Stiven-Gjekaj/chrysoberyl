@@ -74,7 +74,7 @@ reassigns as follows, and lands at eight phases, inside the 5-to-8 range for
   4. The tool refuses a pair it cannot register, and states why, instead of giving a verdict it cannot support.
   5. CI hashes the raw RGBA8 output of the same pair on Linux, macOS, Windows, x86-64, and aarch64, and the hash matches on every commit. This is the phase's determinism exit gate, and the mechanism every later format phase reuses.
 
-**Plans**: 4/8 plans executed
+**Plans**: 5/8 plans executed
 
 Plans:
 **Wave 1**
@@ -95,7 +95,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 01-05-PLAN.md — Refuse a pair the engine cannot register, on a threshold measured from a corpus
+- [x] 01-05-PLAN.md — Refuse a pair the engine cannot register, on a threshold measured from a corpus
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
@@ -228,7 +228,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Raster engine and determinism proof | 4/8 | In Progress|  |
+| 1. Raster engine and determinism proof | 5/8 | In Progress|  |
 | 2. Source trait and a second format | 0/TBD | Not started | - |
 | 3. Baseline, rules and CI gate | 0/TBD | Not started | - |
 | 4. SVG rasterization | 0/TBD | Not started | - |
