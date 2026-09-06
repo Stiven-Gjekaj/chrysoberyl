@@ -70,7 +70,22 @@ reassigns as follows, and lands at eight phases, inside the 5-to-8 range for
   3. The tool does not report an antialiasing difference that a person cannot see.
   4. The tool refuses a pair it cannot register, and states why, instead of giving a verdict it cannot support.
   5. CI hashes the raw RGBA8 output of the same pair on Linux, macOS, Windows, x86-64, and aarch64, and the hash matches on every commit. This is the phase's determinism exit gate, and the mechanism every later format phase reuses.
-**Plans**: TBD
+**Plans**: 8 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Walking skeleton: the workspace, four crates, and one verdict from two real PNG files
+- [ ] 01-02-PLAN.md — Guard every decode and read a pair in PNG, JPEG, WebP and TIFF
+- [ ] 01-03-PLAN.md — The digest report over raw RGBA8 and the six-runner determinism workflow
+- [ ] 01-04-PLAN.md — Global registration on one arithmetic path, with subpixel refinement
+- [ ] 01-05-PLAN.md — Refuse a pair the engine cannot register, on a threshold measured from a corpus
+- [ ] 01-06-PLAN.md — Local registration: warp, summed-area table, block match and the residual field
+- [ ] 01-07-PLAN.md — Classify: labelled regions, antialiasing suppression, change kind and colour
+- [ ] 01-08-PLAN.md — Determinism guards, watched failing on purpose
+
+**Note**: the six-runner matrix cannot run while this repository has no remote,
+which PROJECT.md records as a decision. Plan 01-03 writes and validates the
+workflow and records the green matrix as a human check. Plan 01-08 supplies the
+cross-architecture evidence that can be measured on one machine today.
 
 ### Phase 2: Source trait and a second format
 **Goal**: A new kind of input is added without a change to the comparison engine.
@@ -165,7 +180,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Raster engine and determinism proof | 0/TBD | Not started | - |
+| 1. Raster engine and determinism proof | 0/8 | Planned | - |
 | 2. Source trait and a second format | 0/TBD | Not started | - |
 | 3. Baseline, rules and CI gate | 0/TBD | Not started | - |
 | 4. SVG rasterization | 0/TBD | Not started | - |
