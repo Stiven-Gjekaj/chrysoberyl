@@ -1,0 +1,24 @@
+
+
+# --- Subject -----------------------------------------------------------------
+# One present-tense sentence that says what the change does.
+# Start with a capital. No full stop at the end.
+# No type prefix. "Add the frame loader", not "feat: add the frame loader".
+# No version number. A commit does not change the version.
+# Keep it short. The longest subject in MiruScriptX is 77 characters.
+#
+# --- Body --------------------------------------------------------------------
+# Leave one blank line after the subject.
+# Wrap at 80 columns.
+# Say what was wrong, what the change does, and how you proved it.
+# Name the evidence. A number you can show beats a word like "better".
+#
+# --- Rules -------------------------------------------------------------------
+# One commit does one change.
+# Code and its tests go in one commit. Documentation goes in its own.
+# A rename across many files goes in a commit of its own, with no behaviour
+# change in it.
+# Write in ASD-STE100 Simplified Technical English. Short sentences, active
+# voice, present tense.
+# No em-dash. No emoji.
+# No agent name, no Co-Authored-By line, no session link. A human writes this.
