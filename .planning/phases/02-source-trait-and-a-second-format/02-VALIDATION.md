@@ -1,8 +1,8 @@
 ---
 phase: "2"
 slug: "source-trait-and-a-second-format"
-status: draft
-nyquist_compliant: false
+status: validated
+nyquist_compliant: true
 wave_0_complete: false
 created: "2026-09-07"
 ---
@@ -56,7 +56,7 @@ exists, because this phase creates two crates that do not exist yet.
 | SRC-03 | A GIF pair decodes to a frame vector matching its frame count | integration | `cargo test -p chrys-source-animation gif -- --exact` | W0 |
 | SRC-03 | An APNG pair decodes with disposal and blend already resolved | integration | `cargo test -p chrys-source-animation apng -- --exact` | W0 |
 | SRC-03 | An animated WebP pair decodes, and the hand-assembled fixture round-trips | integration | `cargo test -p chrys-source-animation webp_anim -- --exact` | W0 |
-| SRC-08 | `compare_sequence` refuses on a frame-count mismatch and on an empty side | unit | `cargo test -p chrys-core --lib sequence::tests -- --exact` | W0 |
+| SRC-08 | `compare_sequence` refuses on a frame-count mismatch and on an empty side | unit | `cargo test -p chrys-core --lib sequence` | W0 |
 | SRC-08 | No file under `crates/chrys-core/` changed across the animation wave | drill | `scripts/engine-boundary-drill.sh` | W0 |
 | SRC-08 | The dependency guard stays green with no change | unit | `cargo test -p chrys-core --test determinism no_gpu_or_format_crate_enters_chrys_cores_dependency_graph` | exists |
 | SRC-09 | `Frame::crop_to_region` returns exactly the hint's rectangle | unit | `cargo test -p chrys-source crop_to_region -- --exact` | W0 |
@@ -104,11 +104,24 @@ open question rather than an assumed pass.
 
 ## Validation Sign-Off
 
-- [ ] All tasks have an automated verify or a Wave 0 dependency
-- [ ] Sampling continuity: no 3 consecutive tasks without an automated verify
-- [ ] Wave 0 covers every missing reference
-- [ ] No watch-mode flags
-- [ ] Feedback latency measured
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have an automated verify or a Wave 0 dependency. 13 of 13, 64 commands.
+- [x] Sampling continuity: no 3 consecutive tasks without an automated verify. Cannot fail; all 13 carry one.
+- [x] Wave 0 covers every missing reference. Zero `MISSING` sentinels.
+- [x] No watch-mode flags. Zero matches for watch, nodemon, playwright, cypress, selenium.
+- [ ] Feedback latency measured. Not done, and it needs one green run first.
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending. The checks run against the plans once they exist.
+**Approval:** approved 2026-09-07, on the measured checks above.
+
+## A command in this contract was wrong
+
+The requirement-to-test map first carried
+`cargo test -p chrys-core --lib sequence::tests -- --exact`, lifted from
+`02-RESEARCH.md` without being run. `--exact` matches a whole test name, not a
+module prefix, so that command reports `0 passed; 54 filtered out` and exits
+zero. It is a green result from running nothing, which is the failure `AGENTS.md`
+names under what a test can hold on to.
+
+The planner found it and used `cargo test -p chrys-core --lib sequence` instead.
+The map now carries the working command. The lesson is that a command written
+into a contract is not evidence until someone has watched it run.
