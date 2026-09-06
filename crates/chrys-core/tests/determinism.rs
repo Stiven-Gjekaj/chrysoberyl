@@ -36,6 +36,27 @@
 //! first test is the guard that keeps that mitigation in place: it fails
 //! the moment a future change reaches for the platform method instead of
 //! the pure-Rust one.
+//!
+//! **A fifth test, and what found it.** `scripts/determinism-drill.sh`'s
+//! own planner drill replaces `register/window.rs`'s scalar FFT planner
+//! construction with `rustfft`'s auto-dispatching one, and expects
+//! `scripts/cross-arch-hash.sh` to disagree between architectures
+//! (01-RESEARCH.md's Pitfall 3: the auto-dispatching planner detects CPU
+//! features at runtime, and two machines can then take different
+//! arithmetic through the same call). Running that drill on this
+//! project's own development machine found that it does not: an
+//! aarch64-apple-darwin binary and an x86_64-apple-darwin binary
+//! translated by Rosetta 2 produced the same four digests even with the
+//! auto-dispatching planner in place, because Rosetta's translated
+//! environment does not expose the same CPU feature surface a second,
+//! genuinely different x86-64 machine would, and this project's own
+//! working resolution happens to dispatch to a numerically identical
+//! path on this hardware regardless. A digest comparison that depends on
+//! which two machines happen to be available is not a guard; this
+//! module's fifth test is the fix, checked in this repository's own
+//! source rather than left to depend on hardware. See
+//! `scripts/determinism-drill.sh`'s own comments for the drill that
+//! found this and the record of both attempts.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -69,6 +90,16 @@ const ALLOWED_MATHS: &[(&str, &str)] = &[(
 /// comment and `.planning/phases/01-raster-engine-and-determinism-proof/
 /// 01-RESEARCH.md`'s Pitfall 2.
 const FUSED_MULTIPLY_ADD: &str = "mul_add";
+
+/// The one FFT planner constructor the comparison path may call.
+/// `rustfft::FftPlannerScalar` never dispatches on runtime CPU features.
+/// `rustfft::FftPlanner`, its auto-dispatching sibling, does, and two
+/// machines running the same build can then take different arithmetic
+/// through the same call (`register/window.rs`'s own doc comment;
+/// 01-RESEARCH.md's Pitfall 3). This constant names the auto-dispatching
+/// constructor precisely (`FftPlanner::new(`, not `FftPlannerScalar::new(`,
+/// a distinct substring) so the search below cannot confuse the two.
+const AUTO_DISPATCHING_FFT_PLANNER_CONSTRUCTOR: &str = "FftPlanner::new(";
 
 /// Crate names `chrys-core`'s own dependency graph may never contain.
 ///
@@ -492,5 +523,51 @@ fn no_gpu_or_format_crate_enters_chrys_cores_dependency_graph() {
          one in:\n{}",
         offenders.join(", "),
         tree
+    );
+}
+
+/// Search `stripped` (already run through `strip_comments_and_strings`)
+/// for the literal text `needle`, and return the one-based line number
+/// of every occurrence. Unlike `find_method_calls`, this does not assume
+/// a leading `.`, so it also finds a path-qualified call such as
+/// `Type::constructor(`.
+fn find_substring_occurrences(stripped: &str, needle: &str) -> Vec<usize> {
+    let mut hits = Vec::new();
+    for (line_index, line) in stripped.lines().enumerate() {
+        if line.contains(needle) {
+            hits.push(line_index + 1);
+        }
+    }
+    hits
+}
+
+#[test]
+fn the_comparison_path_never_constructs_the_auto_dispatching_fft_planner() {
+    let mut hits: Vec<(PathBuf, usize)> = Vec::new();
+    for file in rust_files_under(&src_dir()) {
+        let source = fs::read_to_string(&file)
+            .unwrap_or_else(|err| panic!("cannot read {}: {err}", file.display()));
+        let stripped = strip_comments_and_strings(&source);
+        for line in find_substring_occurrences(&stripped, AUTO_DISPATCHING_FFT_PLANNER_CONSTRUCTOR)
+        {
+            hits.push((file.clone(), line));
+        }
+    }
+
+    assert!(
+        hits.is_empty(),
+        "the comparison path constructs rustfft's auto-dispatching \
+         FftPlanner, which detects CPU features at runtime and can take \
+         different arithmetic on two machines for the same call. Use \
+         FftPlannerScalar instead (see register/window.rs's own doc \
+         comment and 01-RESEARCH.md's Pitfall 3):\n{}",
+        hits.iter()
+            .map(|(file, line)| format!(
+                "{}:{} constructs `{AUTO_DISPATCHING_FFT_PLANNER_CONSTRUCTOR}`",
+                file.display(),
+                line
+            ))
+            .collect::<Vec<_>>()
+            .join("\n")
     );
 }

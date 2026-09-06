@@ -80,27 +80,44 @@ fi
 git -C "$drill_worktree" checkout -- crates/chrys-core/src/register/window.rs
 
 # --- Drill two: the planner drill ----------------------------------------
-# Replace the scalar transform planner with the auto-dispatching one, and
-# confirm the cross-architecture digest script goes red and names a
-# differing digest. This is the sharpest pitfall in the phase: two
-# architectures on one machine take different arithmetic through the
-# same call when the planner is left free to choose.
+# Replace the scalar transform planner with the auto-dispatching one.
+# This is the sharpest pitfall in the phase (01-RESEARCH.md's Pitfall 3):
+# two machines can take different arithmetic through the same call when
+# the planner is left free to choose.
+#
+# The first run of this drill asserted only that
+# scripts/cross-arch-hash.sh would disagree, and it did not: an
+# aarch64-apple-darwin binary and an x86_64-apple-darwin binary
+# translated by Rosetta 2 produced the same four digests even with the
+# auto-dispatching planner in place, because Rosetta's translated
+# environment does not expose the same CPU feature surface a second,
+# genuinely different x86-64 machine would. That was a finding about the
+# guard, not about the drill: a digest comparison that depends on which
+# two machines happen to be available is not reliable, so
+# determinism.rs gained a fifth test, a static guard that does not
+# depend on hardware, and that guard is this drill's primary check.
+# cross-arch-hash.sh still runs below, and its result is still printed,
+# as evidence, but no longer decides this drill's outcome.
 sed 's/use rustfft::{Fft, FftDirection, FftPlannerScalar};/use rustfft::{Fft, FftDirection, FftPlanner, FftPlannerScalar};/' \
     "$window_file" >"$window_file.tmp" && mv "$window_file.tmp" "$window_file"
 sed 's/let mut planner = FftPlannerScalar::new();/let mut planner = FftPlanner::new();/' \
     "$window_file" >"$window_file.tmp" && mv "$window_file.tmp" "$window_file"
 
-drill_two_output=$(cd "$drill_worktree" && sh scripts/cross-arch-hash.sh 2>&1)
-drill_two_status=$?
+drill_two_guard_output=$(cd "$drill_worktree" && cargo test -p chrys-core --test determinism \
+    the_comparison_path_never_constructs_the_auto_dispatching_fft_planner 2>&1)
+drill_two_guard_status=$?
 
-if [ "$drill_two_status" -eq 2 ]; then
-    drill_failed "planner drill: the cross-architecture drill is unavailable on this host, so it is not a passing drill"
-    printf '%s\n' "$drill_two_output"
-elif [ "$drill_two_status" -eq 1 ] && printf '%s' "$drill_two_output" | grep -q 'differ'; then
-    drill_ok "planner drill: the cross-architecture digest script went red and named a differing digest"
+echo "determinism-drill: planner drill: also running cross-arch-hash.sh, as evidence only"
+drill_two_cross_arch_output=$(cd "$drill_worktree" && sh scripts/cross-arch-hash.sh 2>&1)
+drill_two_cross_arch_status=$?
+printf '%s\n' "$drill_two_cross_arch_output"
+echo "determinism-drill: planner drill: cross-arch-hash.sh exited $drill_two_cross_arch_status (informational)"
+
+if [ "$drill_two_guard_status" -ne 0 ] && printf '%s' "$drill_two_guard_output" | grep -q 'window\.rs'; then
+    drill_ok "planner drill: the static FFT-planner guard went red and named window.rs"
 else
-    drill_failed "planner drill: expected the cross-architecture script to exit 1 and name a differing digest (exit=$drill_two_status)"
-    printf '%s\n' "$drill_two_output"
+    drill_failed "planner drill: expected the static FFT-planner guard to go red and name window.rs (exit=$drill_two_guard_status)"
+    printf '%s\n' "$drill_two_guard_output"
 fi
 
 git -C "$drill_worktree" checkout -- crates/chrys-core/src/register/window.rs
