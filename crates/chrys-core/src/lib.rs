@@ -10,9 +10,11 @@ pub mod classify;
 pub mod hash;
 pub mod register;
 pub mod residual;
+pub mod sequence;
 pub mod verdict;
 
 use chrys_source::Frame;
+pub use sequence::compare_sequence;
 pub use verdict::{BoundingBox, ChangeKind, ColourDelta, RefusalReason, Region, Verdict};
 
 /// The error `compare` returns when it cannot run at all.
@@ -34,79 +36,21 @@ pub enum CompareError {
 
 /// Compare a base frame to a candidate frame and return a verdict.
 ///
-/// The order of work is fixed: a shape check, then registration, then the
-/// confidence test that decides a refusal, then the local block match, and
-/// only then classification. `compare` refuses a pair whose dimensions
-/// differ, because this project assumes near-identical pairs and does not
-/// scale or crop to make an unequal pair fit. When the shapes match,
-/// `compare` runs phase correlation and scores how sharply it peaks; a
-/// pair whose peak is not sharp enough to trust is refused there, before
-/// any classification work runs on it, because CORE-06 and CORE-07
-/// require the engine to say it cannot register a pair rather than guess
-/// at one. When the pair clears that test, `compare` runs the local block
-/// match, drops any residual pixel that is only antialiasing, and groups
-/// what remains into labelled regions, so a pair whose content moved is
-/// not reported as changed everywhere just because it was not compared in
-/// place, and so two separate changed areas are reported as two regions
-/// rather than one that spans both.
-///
-/// Each region's kind, its offset when it moved, and its colour delta
-/// when it was recoloured, all come from `classify::classify_kind`'s own
-/// ordered decision list; see that function's own doc comment for the
-/// five named rules it applies in order.
+/// This is a thin wrapper over `compare_sequence`, called with a slice of
+/// one frame on each side. There is one comparison pipeline in this crate;
+/// see `sequence::compare_sequence` for the order of work it runs. A
+/// one-against-one sequence can reach neither the empty-sequence check nor
+/// the frame-count check inside `compare_sequence`, so the returned vector
+/// always holds exactly one verdict. The empty case is handled explicitly
+/// below rather than by unwrapping or indexing, because an engine that
+/// produced no verdict is a refusal, and this project never panics on a
+/// path a caller can reach.
 pub fn compare(base: &Frame, candidate: &Frame) -> Result<Verdict, CompareError> {
-    if base.pixel_count() == 0 || candidate.pixel_count() == 0 {
-        return Err(CompareError::EmptyFrame);
-    }
-
-    if !base.same_shape_as(candidate) {
-        return Ok(Verdict::Refused {
-            reason: RefusalReason::DimensionMismatch {
-                base: (base.width, base.height),
-                candidate: (candidate.width, candidate.height),
-            },
-        });
-    }
-
-    // Refusing before classifying is the point, not an optimisation. This
-    // project's core value only holds for a near-identical pair; a pair
-    // whose registration cannot find a peak sharp enough to trust falls
-    // outside that assumption, so nothing past this point may run on it.
-    let (refined, surface) = register::phase_correlate(base, candidate)?;
-    let peak_index = register::peak_index(refined.whole, surface.resolution);
-    let confidence = register::assess_peak(&surface, peak_index);
-    if confidence.ratio < register::REFUSAL_THRESHOLD {
-        return Ok(Verdict::Refused {
-            reason: RefusalReason::PeakConfidenceTooLow {
-                ratio: confidence.ratio,
-                threshold: register::REFUSAL_THRESHOLD,
-            },
-        });
-    }
-
-    let mut field = register::block_match(base, candidate, refined.whole)?;
-    classify::suppress_antialiasing(&mut field, base, candidate);
-    let labelled_regions = classify::label_regions(&field);
-
-    if labelled_regions.is_empty() {
-        return Ok(Verdict::Identical);
-    }
-
-    let regions = labelled_regions
-        .into_iter()
-        .map(|labelled| {
-            let (kind, offset_px, colour_delta) =
-                classify::classify_kind(&labelled, base, candidate, &field.blocks);
-            Region {
-                kind,
-                bbox: labelled.bbox,
-                offset_px,
-                colour_delta,
-            }
-        })
-        .collect();
-
-    Ok(Verdict::Changed { regions })
+    let mut verdicts =
+        sequence::compare_sequence(std::slice::from_ref(base), std::slice::from_ref(candidate))?;
+    Ok(verdicts.pop().unwrap_or(Verdict::Refused {
+        reason: RefusalReason::EmptySequence,
+    }))
 }
 
 #[cfg(test)]

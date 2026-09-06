@@ -8,6 +8,7 @@ use std::process::ExitCode;
 
 use chrys_source::{Frame, Source};
 use chrys_source_raster::RasterSource;
+use chrys_source_sequence::SequenceSource;
 use clap::{Parser, Subcommand};
 
 /// A structural diff for raster images.
@@ -62,31 +63,60 @@ fn run_compare(
     candidate_path: &Path,
     hash_only: bool,
 ) -> anyhow::Result<ExitCode> {
-    let source = RasterSource::new();
-    let base_frame = load_first_frame(&source, base_path)?;
-    let candidate_frame = load_first_frame(&source, candidate_path)?;
+    let base_frames = frames_for(base_path)?;
+    let candidate_frames = frames_for(candidate_path)?;
 
-    let verdict = chrys_core::compare(&base_frame, &candidate_frame)?;
+    let verdicts = chrys_core::compare_sequence(&base_frames, &candidate_frames)?;
 
     if hash_only {
-        let digests = chrys_core::hash::digest_report(&base_frame, &candidate_frame, &verdict)?;
+        let base_frame = base_frames
+            .first()
+            .ok_or_else(|| anyhow::anyhow!("{} decoded to zero frames", base_path.display()))?;
+        let candidate_frame = candidate_frames.first().ok_or_else(|| {
+            anyhow::anyhow!("{} decoded to zero frames", candidate_path.display())
+        })?;
+        let verdict = verdicts
+            .first()
+            .ok_or_else(|| anyhow::anyhow!("compare_sequence returned no verdict"))?;
+        let digests = chrys_core::hash::digest_report(base_frame, candidate_frame, verdict)?;
         print!("{digests}");
         return Ok(ExitCode::from(0));
     }
 
-    print!("{verdict}");
+    // A one-against-one sequence prints exactly what phase 1's `compare`
+    // printed, so a single-file pair's stdout stays byte-identical to what
+    // it was before this crate learned about sequences.
+    if verdicts.len() == 1 {
+        print!("{}", verdicts[0]);
+    } else {
+        for (index, verdict) in verdicts.iter().enumerate() {
+            println!("frame {index}");
+            print!("{verdict}");
+        }
+    }
 
-    Ok(match verdict {
-        chrys_core::Verdict::Identical => ExitCode::from(0),
-        chrys_core::Verdict::Changed { .. } => ExitCode::from(1),
-        chrys_core::Verdict::Refused { .. } => ExitCode::from(2),
-    })
+    let worst = verdicts.iter().map(verdict_rank).max().unwrap_or(0);
+    Ok(ExitCode::from(worst))
 }
 
-fn load_first_frame(source: &RasterSource, path: &Path) -> anyhow::Result<Frame> {
-    let mut frames = source.load(path)?;
-    if frames.is_empty() {
-        anyhow::bail!("{} decoded to zero frames", path.display());
+/// Rank a verdict for the process exit code: refused above changed above
+/// identical. A caller branching on the exit code of a sequence pair keeps
+/// the same three meanings a single-pair comparison already reports.
+fn verdict_rank(verdict: &chrys_core::Verdict) -> u8 {
+    match verdict {
+        chrys_core::Verdict::Identical => 0,
+        chrys_core::Verdict::Changed { .. } => 1,
+        chrys_core::Verdict::Refused { .. } => 2,
     }
-    Ok(frames.remove(0))
+}
+
+/// Load the frames at `path`. A directory loads as a numbered frame
+/// sequence through `SequenceSource`; any other path loads as a single
+/// raster image through `RasterSource`.
+fn frames_for(path: &Path) -> anyhow::Result<Vec<Frame>> {
+    if path.is_dir() {
+        Ok(SequenceSource::new().load(path)?)
+    } else {
+        Ok(RasterSource::new().load(path)?)
+    }
 }

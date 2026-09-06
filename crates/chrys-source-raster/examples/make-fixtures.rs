@@ -67,6 +67,7 @@ fn main() {
     write_pair_01(&base, &candidate);
     write_format_fixtures(&base, &candidate);
     write_refusal_corpus();
+    write_sequence_01();
 }
 
 /// Write the first committed pair, read by plan 01-03. Its bytes must not
@@ -366,6 +367,45 @@ fn write_refusal_group(group: &str, pairs: Vec<RefusalPair>) {
             .save(&base_path)
             .unwrap_or_else(|e| panic!("write {}: {e}", base_path.display()));
         pair.candidate
+            .save(&candidate_path)
+            .unwrap_or_else(|e| panic!("write {}: {e}", candidate_path.display()));
+
+        println!("wrote {}", base_path.display());
+        println!("wrote {}", candidate_path.display());
+    }
+}
+
+/// Write the committed sequence fixture, read by `chrys-source-sequence`.
+///
+/// 11 frames per side, named `frame1.png` through `frame11.png` with no
+/// zero padding, on purpose: the natural-sort trap sits in a committed
+/// file from the first commit rather than in a later bug report. Frame
+/// `i` on both sides is `build_structured_canvas(i as i64, 0)`, so every
+/// index is a near-identical pair that registers. On the candidate side
+/// only, frame 5 is recoloured, so exactly one index carries a change and
+/// the other ten are the same picture.
+fn write_sequence_01() {
+    let base_dir = golden_root().join("sequence-01").join("base");
+    let candidate_dir = golden_root().join("sequence-01").join("candidate");
+    std::fs::create_dir_all(&base_dir)
+        .unwrap_or_else(|e| panic!("create {}: {e}", base_dir.display()));
+    std::fs::create_dir_all(&candidate_dir)
+        .unwrap_or_else(|e| panic!("create {}: {e}", candidate_dir.display()));
+
+    for i in 1..=11i64 {
+        let base_frame = build_structured_canvas(i, 0);
+        let mut candidate_frame = build_structured_canvas(i, 0);
+        if i == 5 {
+            recolour_first_rect(&mut candidate_frame, Rgba([40, 200, 200, 255]));
+        }
+
+        let base_path = base_dir.join(format!("frame{i}.png"));
+        let candidate_path = candidate_dir.join(format!("frame{i}.png"));
+
+        base_frame
+            .save(&base_path)
+            .unwrap_or_else(|e| panic!("write {}: {e}", base_path.display()));
+        candidate_frame
             .save(&candidate_path)
             .unwrap_or_else(|e| panic!("write {}: {e}", candidate_path.display()));
 

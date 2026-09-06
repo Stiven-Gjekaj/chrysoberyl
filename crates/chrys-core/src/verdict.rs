@@ -114,6 +114,17 @@ pub enum RefusalReason {
         /// The ratio `ratio` needed to clear, and did not.
         threshold: f32,
     },
+    /// The base and candidate sequences hold a different number of frames.
+    /// `compare_sequence` pairs frames by index and does not pair a prefix
+    /// or interpolate a missing one.
+    FrameCountMismatch {
+        /// The number of frames the base sequence holds.
+        base: usize,
+        /// The number of frames the candidate sequence holds.
+        candidate: usize,
+    },
+    /// A side of the pair decoded to no frame at all.
+    EmptySequence,
 }
 
 impl fmt::Display for RefusalReason {
@@ -130,6 +141,15 @@ impl fmt::Display for RefusalReason {
                  below the threshold {threshold:.2}; this engine compares near-identical \
                  pairs only"
             ),
+            RefusalReason::FrameCountMismatch { base, candidate } => write!(
+                f,
+                "frame count mismatch: base holds {base} frames, candidate holds \
+                 {candidate} frames; this engine pairs frames by index and does not \
+                 pair a prefix or interpolate a missing one"
+            ),
+            RefusalReason::EmptySequence => {
+                write!(f, "a side of the pair decoded to no frame at all")
+            }
         }
     }
 }

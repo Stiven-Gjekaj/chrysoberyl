@@ -117,6 +117,7 @@ dependencies = [
  "chrys-core",
  "chrys-source",
  "chrys-source-raster",
+ "chrys-source-sequence",
  "clap",
 ]
 
@@ -143,6 +144,16 @@ version = "0.1.0"
 dependencies = [
  "chrys-source",
  "image",
+ "thiserror",
+]
+
+[[package]]
+name = "chrys-source-sequence"
+version = "0.1.0"
+dependencies = [
+ "chrys-source",
+ "chrys-source-raster",
+ "natord",
  "thiserror",
 ]
 
@@ -368,6 +379,12 @@ dependencies = [
  "num-traits",
  "pxfm",
 ]
+
+[[package]]
+name = "natord"
+version = "1.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "308d96db8debc727c3fd9744aac51751243420e46edf401010908da7f8d5e57c"
 
 [[package]]
 name = "num-complex"

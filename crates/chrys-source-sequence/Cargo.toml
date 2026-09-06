@@ -1,5 +1,5 @@
 [package]
-name = "chrys-cli"
+name = "chrys-source-sequence"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
@@ -8,14 +8,8 @@ rust-version.workspace = true
 [lints]
 workspace = true
 
-[[bin]]
-name = "chrys"
-path = "src/main.rs"
-
 [dependencies]
 chrys-source = { path = "../chrys-source" }
 chrys-source-raster = { path = "../chrys-source-raster" }
-chrys-source-sequence = { path = "../chrys-source-sequence" }
-chrys-core = { path = "../chrys-core" }
-clap.workspace = true
-anyhow.workspace = true
+thiserror.workspace = true
+natord.workspace = true
