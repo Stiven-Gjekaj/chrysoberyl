@@ -8,13 +8,17 @@
 //! no optical flow.
 
 pub mod confidence;
+pub mod integral;
 pub mod luma;
 pub mod phase_correlation;
 pub mod subpixel;
+pub mod warp;
 pub mod window;
 
 pub use confidence::{PeakConfidence, REFUSAL_THRESHOLD, assess_peak};
+pub use integral::IntegralImage;
 pub use luma::to_luma_downsampled;
 pub use phase_correlation::{CoarseOffset, CorrelationSurface, peak_index, phase_correlate};
 pub use subpixel::{RefinedOffset, refine_peak};
+pub use warp::{FILL_VALUE, difference_image, warp_by_offset};
 pub use window::{WORKING_RESOLUTION, hann_table, plan_scalar_fft};
