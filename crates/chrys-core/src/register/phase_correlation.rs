@@ -9,6 +9,7 @@ use chrys_source::Frame;
 
 use crate::CompareError;
 use crate::register::luma::to_luma_downsampled;
+use crate::register::subpixel::{RefinedOffset, UPSAMPLE_FACTOR, refine_peak};
 use crate::register::window::{WORKING_RESOLUTION, cached_hann_table, plan_scalar_fft};
 
 /// The whole-pixel translation `phase_correlate` reports, at full-frame
@@ -46,9 +47,9 @@ pub struct CorrelationSurface {
     pub spectrum: Vec<Complex32>,
 }
 
-/// Register `candidate` against `base` and report the coarse translation
-/// between them, in full-frame pixels, alongside the surface that
-/// translation was read from.
+/// Register `candidate` against `base` and report the translation between
+/// them, refined below one pixel, alongside the surface that translation
+/// was read from.
 ///
 /// The steps: downsample both frames through `to_luma_downsampled`; window
 /// each row and column with the cached Hann table; run the forward 2D
@@ -58,11 +59,16 @@ pub struct CorrelationSurface {
 /// by its own magnitude (computed with `sqrt`, which Rust's precision
 /// documentation states is guaranteed not to change); run the inverse 2D
 /// transform the same way; and take the largest magnitude in the surface,
-/// breaking a tie by the lowest linear index.
+/// breaking a tie by the lowest linear index. The whole-pixel result of
+/// that search is then refined by `refine_peak`, at `UPSAMPLE_FACTOR`.
+///
+/// `RefinedOffset::whole` is the value CORE-02 reports; the fractional part
+/// exists for the block-match stage in plan 01-06 and for a future warp,
+/// not for the printed verdict.
 pub fn phase_correlate(
     base: &Frame,
     candidate: &Frame,
-) -> Result<(CoarseOffset, CorrelationSurface), CompareError> {
+) -> Result<(RefinedOffset, CorrelationSurface), CompareError> {
     let base_luma = to_luma_downsampled(base);
     let candidate_luma = to_luma_downsampled(candidate);
 
@@ -105,14 +111,14 @@ pub fn phase_correlate(
         dy: to_signed_shift(peak_y, n),
     };
 
-    Ok((
-        coarse,
-        CorrelationSurface {
-            magnitudes,
-            resolution: n,
-            spectrum: cross_power,
-        },
-    ))
+    let surface = CorrelationSurface {
+        magnitudes,
+        resolution: n,
+        spectrum: cross_power,
+    };
+    let refined = refine_peak(&surface, coarse, UPSAMPLE_FACTOR);
+
+    Ok((refined, surface))
 }
 
 /// Compute `|c|` with `sqrt`, never with `Complex::norm`, which routes
@@ -140,6 +146,16 @@ fn to_signed_shift(peak_index: usize, resolution: usize) -> i32 {
         peak_index as i32
     };
     -raw
+}
+
+/// Undo `to_signed_shift`: recover the raw, unwrapped bin index a signed
+/// offset came from. Plan 01-04's subpixel refinement step needs this to
+/// find where, in the surface, to search for the fractional part of a
+/// coarse offset `phase_correlate` already reported.
+pub(crate) fn unwrap_bin_index(signed: i32, resolution: usize) -> usize {
+    let n = resolution as i32;
+    let raw = if signed <= 0 { -signed } else { n - signed };
+    raw as usize
 }
 
 /// Window `luma` by `window` on both axes and run the forward 2D
@@ -252,34 +268,42 @@ mod tests {
     fn a_shift_right_and_down_reports_the_correct_positive_offset() {
         let base = synthetic_frame();
         let candidate = shift_frame(&base, 12, 5);
-        let (offset, _surface) = phase_correlate(&base, &candidate).unwrap();
-        assert_eq!(offset.dx, 12);
-        assert_eq!(offset.dy, 5);
+        let (refined, _surface) = phase_correlate(&base, &candidate).unwrap();
+        assert_eq!(refined.whole.dx, 12);
+        assert_eq!(refined.whole.dy, 5);
     }
 
     #[test]
     fn the_reversed_shift_reports_the_negative_offset() {
         let base = synthetic_frame();
         let candidate = shift_frame(&base, -12, -5);
-        let (offset, _surface) = phase_correlate(&base, &candidate).unwrap();
-        assert_eq!(offset.dx, -12);
-        assert_eq!(offset.dy, -5);
+        let (refined, _surface) = phase_correlate(&base, &candidate).unwrap();
+        assert_eq!(refined.whole.dx, -12);
+        assert_eq!(refined.whole.dy, -5);
     }
 
     #[test]
     fn two_identical_frames_report_a_zero_offset() {
         let base = synthetic_frame();
-        let (offset, _surface) = phase_correlate(&base, &base.clone()).unwrap();
-        assert_eq!(offset.dx, 0);
-        assert_eq!(offset.dy, 0);
+        let (refined, _surface) = phase_correlate(&base, &base.clone()).unwrap();
+        assert_eq!(refined.whole.dx, 0);
+        assert_eq!(refined.whole.dy, 0);
     }
 
     #[test]
     fn two_runs_on_the_same_pair_return_bit_identical_surfaces() {
         let base = synthetic_frame();
         let candidate = shift_frame(&base, 12, 5);
-        let (_offset_a, surface_a) = phase_correlate(&base, &candidate).unwrap();
-        let (_offset_b, surface_b) = phase_correlate(&base, &candidate).unwrap();
+        let (_refined_a, surface_a) = phase_correlate(&base, &candidate).unwrap();
+        let (_refined_b, surface_b) = phase_correlate(&base, &candidate).unwrap();
         assert_eq!(surface_a.magnitudes, surface_b.magnitudes);
+    }
+
+    #[test]
+    fn to_signed_shift_and_unwrap_bin_index_round_trip() {
+        for raw in 0..WORKING_RESOLUTION {
+            let signed = to_signed_shift(raw, WORKING_RESOLUTION);
+            assert_eq!(unwrap_bin_index(signed, WORKING_RESOLUTION), raw);
+        }
     }
 }

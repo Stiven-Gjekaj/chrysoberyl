@@ -2,7 +2,9 @@
 //! grid, the window table, and phase correlation's coarse offset.
 
 use chrys_core::hash::rgba8_digest;
-use chrys_core::register::{WORKING_RESOLUTION, hann_table, phase_correlate, plan_scalar_fft};
+use chrys_core::register::{
+    WORKING_RESOLUTION, hann_table, phase_correlate, plan_scalar_fft, refine_peak,
+};
 use chrys_source::Frame;
 use rustfft::FftDirection;
 use rustfft::num_complex::Complex32;
@@ -93,35 +95,76 @@ fn hann_table_is_symmetric_with_zero_ends_and_is_stable_across_calls() {
 fn a_shift_right_and_down_reports_a_positive_dx_and_dy() {
     let base = synthetic_frame();
     let candidate = shift_frame(&base, 12, 5);
-    let (offset, _surface) = phase_correlate(&base, &candidate).unwrap();
-    assert_eq!(offset.dx, 12);
-    assert_eq!(offset.dy, 5);
+    let (refined, _surface) = phase_correlate(&base, &candidate).unwrap();
+    assert_eq!(refined.whole.dx, 12);
+    assert_eq!(refined.whole.dy, 5);
 }
 
 #[test]
 fn the_reversed_shift_reports_the_negative_offset_on_both_axes() {
     let base = synthetic_frame();
     let candidate = shift_frame(&base, -12, -5);
-    let (offset, _surface) = phase_correlate(&base, &candidate).unwrap();
-    assert_eq!(offset.dx, -12);
-    assert_eq!(offset.dy, -5);
+    let (refined, _surface) = phase_correlate(&base, &candidate).unwrap();
+    assert_eq!(refined.whole.dx, -12);
+    assert_eq!(refined.whole.dy, -5);
 }
 
 #[test]
 fn two_identical_frames_report_a_zero_offset() {
     let base = synthetic_frame();
-    let (offset, _surface) = phase_correlate(&base, &base.clone()).unwrap();
-    assert_eq!(offset.dx, 0);
-    assert_eq!(offset.dy, 0);
+    let (refined, _surface) = phase_correlate(&base, &base.clone()).unwrap();
+    assert_eq!(refined.whole.dx, 0);
+    assert_eq!(refined.whole.dy, 0);
 }
 
 #[test]
 fn two_runs_of_phase_correlate_return_bit_identical_correlation_surfaces() {
     let base = synthetic_frame();
     let candidate = shift_frame(&base, 12, 5);
-    let (_offset_a, surface_a) = phase_correlate(&base, &candidate).unwrap();
-    let (_offset_b, surface_b) = phase_correlate(&base, &candidate).unwrap();
+    let (_refined_a, surface_a) = phase_correlate(&base, &candidate).unwrap();
+    let (_refined_b, surface_b) = phase_correlate(&base, &candidate).unwrap();
     assert_eq!(surface_a.magnitudes, surface_b.magnitudes);
+}
+
+#[test]
+fn a_peak_exactly_on_a_sample_refines_to_a_zero_fractional_part_on_both_axes() {
+    let base = synthetic_frame();
+    let (refined, surface) = phase_correlate(&base, &base.clone()).unwrap();
+    let coarse = refined.whole;
+    let refined_again = refine_peak(&surface, coarse, 50);
+    assert_eq!(refined_again.whole, coarse);
+    assert!(refined_again.fractional_x.abs() < 0.01);
+    assert!(refined_again.fractional_y.abs() < 0.01);
+}
+
+#[test]
+fn a_whole_pixel_shift_refines_to_within_a_hundredth_of_a_pixel_of_zero() {
+    let base = synthetic_frame();
+    let candidate = shift_frame(&base, 12, 5);
+    let (refined, surface) = phase_correlate(&base, &candidate).unwrap();
+    let refined_again = refine_peak(&surface, refined.whole, 50);
+    assert!(refined_again.fractional_x.abs() < 0.01);
+    assert!(refined_again.fractional_y.abs() < 0.01);
+}
+
+#[test]
+fn two_runs_of_refine_peak_on_the_same_input_agree_exactly() {
+    let base = synthetic_frame();
+    let candidate = shift_frame(&base, 12, 5);
+    let (refined, surface) = phase_correlate(&base, &candidate).unwrap();
+    let refined_a = refine_peak(&surface, refined.whole, 50);
+    let refined_b = refine_peak(&surface, refined.whole, 50);
+    assert_eq!(refined_a, refined_b);
+}
+
+#[test]
+fn coarse_offset_still_reports_whole_pixels_separately_from_the_fraction() {
+    let base = synthetic_frame();
+    let candidate = shift_frame(&base, 12, 5);
+    let (refined, surface) = phase_correlate(&base, &candidate).unwrap();
+    let refined_again = refine_peak(&surface, refined.whole, 50);
+    assert_eq!(refined_again.whole.dx, 12);
+    assert_eq!(refined_again.whole.dy, 5);
 }
 
 /// A fixed 512-sample input, from a deterministic integer formula, holds
