@@ -14,3 +14,9 @@ thiserror.workspace = true
 sha2.workspace = true
 rustfft.workspace = true
 libm.workspace = true
+
+# Test-only. `chrys-core` itself still names no format crate; this decodes
+# the committed refusal corpus in `tests/refusal.rs` only, the same way
+# `chrys-cli` already depends on `chrys-source-raster` for its own tests.
+[dev-dependencies]
+chrys-source-raster = { path = "../chrys-source-raster" }

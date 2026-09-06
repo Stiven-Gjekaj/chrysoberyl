@@ -158,6 +158,20 @@ pub(crate) fn unwrap_bin_index(signed: i32, resolution: usize) -> usize {
     raw as usize
 }
 
+/// Recover the raw, row-major linear index into a `CorrelationSurface`'s
+/// `magnitudes` buffer that `offset` was read from.
+///
+/// `phase_correlate` reports its whole-pixel result as a signed
+/// `CoarseOffset`, not as the raw bin index the surface search actually
+/// found. `assess_peak`, in `register::confidence`, needs that raw index
+/// back, so this function undoes `to_signed_shift` on both axes and
+/// combines the two raw bins into one linear index.
+pub fn peak_index(offset: CoarseOffset, resolution: usize) -> usize {
+    let x = unwrap_bin_index(offset.dx, resolution);
+    let y = unwrap_bin_index(offset.dy, resolution);
+    y * resolution + x
+}
+
 /// Window `luma` by `window` on both axes and run the forward 2D
 /// transform: a row pass, then a column pass, every 1D plan coming from
 /// `plan_scalar_fft`.
@@ -305,5 +319,15 @@ mod tests {
             let signed = to_signed_shift(raw, WORKING_RESOLUTION);
             assert_eq!(unwrap_bin_index(signed, WORKING_RESOLUTION), raw);
         }
+    }
+
+    #[test]
+    fn peak_index_recovers_the_raw_linear_index_a_coarse_offset_came_from() {
+        let base = synthetic_frame();
+        let candidate = shift_frame(&base, 12, 5);
+        let (refined, surface) = phase_correlate(&base, &candidate).unwrap();
+        let index = peak_index(refined.whole, surface.resolution);
+        let expected_peak = surface.magnitudes.iter().cloned().fold(f32::MIN, f32::max);
+        assert_eq!(surface.magnitudes[index], expected_peak);
     }
 }

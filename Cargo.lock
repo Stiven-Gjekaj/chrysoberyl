@@ -119,6 +119,7 @@ name = "chrys-core"
 version = "0.1.0"
 dependencies = [
  "chrys-source",
+ "chrys-source-raster",
  "libm",
  "rustfft",
  "sha2",
