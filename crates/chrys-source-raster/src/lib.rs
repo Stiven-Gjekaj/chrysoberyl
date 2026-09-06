@@ -1,6 +1,12 @@
 //! The raster source adapter. This is the only crate that knows a raster
 //! file format. It depends on `chrys-source` and on the `image` crate, and
 //! it never depends on `chrys-core`.
+//!
+//! Every decode in this crate goes through `decode::decode_guarded`, the
+//! single guarded entry point that reads the declared dimensions and
+//! rejects them against a configured limit before a pixel buffer is
+//! allocated. Nothing else in this crate opens an `image::ImageReader` or
+//! an `image` decoder directly.
 
 #![forbid(unsafe_code)]
 
@@ -8,12 +14,15 @@ use std::path::{Path, PathBuf};
 
 use chrys_source::{Frame, Source};
 
+pub mod decode;
+pub mod normalize;
+
 /// Resource limits applied to a decode, so a crafted file cannot force an
 /// unbounded allocation before this crate has read a single pixel.
 ///
 /// This is the mitigation for the decompression-bomb class of attack
 /// (CVE-2023-29408): the limits are built into an `image::Limits` value and
-/// handed to the reader before `decode` is called.
+/// handed to the decoder before any pixel data is read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DecodeLimits {
     /// The largest width, in pixels, this crate will decode.
@@ -36,7 +45,7 @@ impl Default for DecodeLimits {
 }
 
 impl DecodeLimits {
-    fn to_image_limits(self) -> image::Limits {
+    pub(crate) fn to_image_limits(self) -> image::Limits {
         let mut limits = image::Limits::default();
         limits.max_image_width = Some(self.max_width);
         limits.max_image_height = Some(self.max_height);
@@ -114,59 +123,16 @@ impl Source for RasterSource {
     type Error = RasterError;
 
     fn load(&self, path: &Path) -> Result<Vec<Frame>, Self::Error> {
-        let path_buf = path.to_path_buf();
-        let img_limits = self.limits.to_image_limits();
-
-        // Every decode call in this crate sets limits before it runs, so
-        // there is no unguarded path from a file on disk to a pixel buffer.
-        let mut reader = image::ImageReader::open(path).map_err(|source| RasterError::Io {
-            path: path_buf.clone(),
-            source,
-        })?;
-        reader.limits(img_limits);
-
-        let dynamic = match reader.decode() {
-            Ok(dynamic) => dynamic,
-            Err(image::ImageError::Limits(_)) => {
-                let (width, height) = probe_dimensions(path).unwrap_or((0, 0));
-                return Err(RasterError::TooLarge {
-                    path: path_buf,
-                    width,
-                    height,
-                    limit: self.limits.max_width.max(self.limits.max_height),
-                });
-            }
-            Err(image::ImageError::Unsupported(_)) => {
-                return Err(RasterError::Unsupported { path: path_buf });
-            }
-            Err(source) => {
-                return Err(RasterError::Decode {
-                    path: path_buf,
-                    message: source.to_string(),
-                });
-            }
-        };
-
-        let rgba = dynamic.to_rgba8();
-        let (width, height) = rgba.dimensions();
+        let (dynamic, orientation) = decode::decode_guarded(path, &self.limits)?;
+        let (pixels, width, height) = normalize::normalize_to_rgba8(dynamic, orientation);
         Ok(vec![Frame {
-            pixels: rgba.into_raw(),
+            pixels,
             width,
             height,
             index: 0,
             hints: Vec::new(),
         }])
     }
-}
-
-/// Read only the header dimensions of the file at `path`, with no width or
-/// height limit applied, so a `TooLarge` error can report the true size.
-/// This never decodes pixel data, so it stays safe against a crafted
-/// header that claims an enormous image.
-fn probe_dimensions(path: &Path) -> Option<(u32, u32)> {
-    let mut reader = image::ImageReader::open(path).ok()?;
-    reader.no_limits();
-    reader.into_dimensions().ok()
 }
 
 #[cfg(test)]
