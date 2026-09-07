@@ -281,7 +281,7 @@ fn suppression_runs_before_labelling_so_an_edge_pixel_never_joins_a_region() {
     // The diagonal band runs through the interior box at local (x, x);
     // (10, 10) sits on it (margin 5, local (5, 5)).
     let idx = (10 * field.width + 10) * 4;
-    assert_eq!(&field.samples[idx..idx + 3], &[0, 0, 0]);
+    assert_eq!(&field.samples[idx..idx + 4], &[0, 0, 0, 0]);
 }
 
 #[test]

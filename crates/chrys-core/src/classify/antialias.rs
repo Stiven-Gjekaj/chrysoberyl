@@ -80,7 +80,11 @@ pub fn is_antialiasing(base: &Frame, candidate: &Frame, x: u32, y: u32) -> bool 
     min_is_gradient_endpoint && max_is_gradient_endpoint
 }
 
-/// Zero every residual sample whose pixel `is_antialiasing` accepts.
+/// Zero all four residual bytes of every pixel `is_antialiasing` accepts,
+/// including the fourth. Without the fourth byte, a pixel this rule
+/// accepts would still carry its own alpha difference into `label_regions`,
+/// since alpha is part of what "changed" means; zeroing only three bytes
+/// would suppress nothing on any pair whose edge is expressed in alpha.
 ///
 /// Call this before `label_regions`, not from inside it, so the two
 /// stages stay separately testable: suppression decides which pixels are
@@ -96,6 +100,7 @@ pub fn suppress_antialiasing(residual: &mut ResidualField, base: &Frame, candida
                 residual.samples[idx] = 0;
                 residual.samples[idx + 1] = 0;
                 residual.samples[idx + 2] = 0;
+                residual.samples[idx + 3] = 0;
             }
         }
     }
