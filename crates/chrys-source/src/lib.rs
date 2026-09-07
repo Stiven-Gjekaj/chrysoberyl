@@ -183,6 +183,67 @@ mod tests {
         assert!(a.same_shape_as(&b));
         assert!(!a.same_shape_as(&c));
     }
+
+    fn hint(name: &str, x: u32, y: u32, width: u32, height: u32) -> RegionHint {
+        RegionHint {
+            name: name.to_string(),
+            x,
+            y,
+            width,
+            height,
+        }
+    }
+
+    #[test]
+    fn a_hint_wider_than_the_frame_is_refused() {
+        let f = frame(100, 100);
+        let h = hint("wide", 0, 0, 200, 50);
+        let error = f.crop_to_region(&h).expect_err("does not fit");
+        assert_eq!(error.name, "wide");
+        assert_eq!(error.rectangle, (0, 0, 200, 50));
+        assert_eq!(error.frame_size, (100, 100));
+        let message = error.to_string();
+        assert!(message.contains("wide"));
+        assert!(message.contains("200x50"));
+        assert!(message.contains("100x100"));
+    }
+
+    #[test]
+    fn a_hint_taller_than_the_frame_is_refused() {
+        let f = frame(100, 100);
+        let h = hint("tall", 0, 0, 50, 200);
+        let error = f.crop_to_region(&h).expect_err("does not fit");
+        let message = error.to_string();
+        assert!(message.contains("tall"));
+        assert!(message.contains("50x200"));
+        assert!(message.contains("100x100"));
+    }
+
+    #[test]
+    fn a_hint_whose_origin_sits_outside_the_frame_is_refused() {
+        let f = frame(100, 100);
+        let h = hint("outside", 90, 90, 20, 20);
+        let error = f.crop_to_region(&h).expect_err("does not fit");
+        assert_eq!(error.name, "outside");
+    }
+
+    #[test]
+    fn a_hint_whose_x_plus_width_overflows_a_u32_is_refused_rather_than_wrapping() {
+        let f = frame(100, 100);
+        let h = hint("overflow", u32::MAX - 5, 0, 10, 10);
+        let error = f
+            .crop_to_region(&h)
+            .expect_err("checked arithmetic refuses this");
+        assert_eq!(error.name, "overflow");
+    }
+
+    #[test]
+    fn a_hint_of_zero_width_is_refused() {
+        let f = frame(100, 100);
+        let h = hint("empty", 10, 10, 0, 20);
+        let error = f.crop_to_region(&h).expect_err("zero width is refused");
+        assert_eq!(error.name, "empty");
+    }
 }
 
 /// A frame whose pixel `(x, y)` holds a byte value derived from its own

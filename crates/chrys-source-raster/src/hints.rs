@@ -136,4 +136,103 @@ mod tests {
         assert_eq!(hints[0].width, 30);
         assert_eq!(hints[0].height, 40);
     }
+
+    /// Write `contents` to a fresh temporary sidecar and image path pair,
+    /// call `read_hints_sidecar` on the image path, and return the result
+    /// with the sidecar removed. `label` keeps every temporary file this
+    /// test module writes from colliding with another test's own file.
+    fn read_temp_sidecar(label: &str, contents: &str) -> Result<Vec<RegionHint>, RasterError> {
+        let dir = std::env::temp_dir();
+        let image_path = dir.join(format!("chrys-hints-test-{label}.png"));
+        let sidecar_path = dir.join(format!("chrys-hints-test-{label}.hints.toml"));
+        std::fs::write(&sidecar_path, contents).expect("write sidecar");
+        let result = read_hints_sidecar(&image_path);
+        std::fs::remove_file(&sidecar_path).ok();
+        result
+    }
+
+    #[test]
+    fn invalid_toml_fails_with_a_message_naming_the_line() {
+        let error = read_temp_sidecar("invalid-toml", "[[hint]\nname = \"logo\"\n")
+            .expect_err("malformed TOML is refused");
+        match error {
+            RasterError::MalformedHints { message, .. } => {
+                assert!(
+                    message.contains("line"),
+                    "message does not name a line: {message}"
+                );
+            }
+            other => panic!("expected RasterError::MalformedHints, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn an_unknown_key_fails_rather_than_being_ignored() {
+        let error = read_temp_sidecar(
+            "unknown-key",
+            "[[hint]]\nname = \"logo\"\nw = 10\ny = 20\nwidth = 30\nheight = 40\nx = 5\n",
+        )
+        .expect_err("an unknown key is refused, not silently dropped");
+        match error {
+            RasterError::MalformedHints { message, .. } => {
+                assert!(
+                    message.contains('w'),
+                    "message does not name the unknown field: {message}"
+                );
+            }
+            other => panic!("expected RasterError::MalformedHints, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_negative_coordinate_fails_with_a_message_naming_the_field() {
+        let error = read_temp_sidecar(
+            "negative-coordinate",
+            "[[hint]]\nname = \"logo\"\nx = -5\ny = 20\nwidth = 30\nheight = 40\n",
+        )
+        .expect_err("a negative coordinate does not fit a u32 field");
+        match error {
+            RasterError::MalformedHints { message, .. } => {
+                assert!(
+                    message.contains('x'),
+                    "message does not name the field: {message}"
+                );
+            }
+            other => panic!("expected RasterError::MalformedHints, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_non_integer_coordinate_fails_with_a_message_naming_the_field() {
+        let error = read_temp_sidecar(
+            "non-integer-coordinate",
+            "[[hint]]\nname = \"logo\"\nx = \"ten\"\ny = 20\nwidth = 30\nheight = 40\n",
+        )
+        .expect_err("a string does not fit a u32 field");
+        match error {
+            RasterError::MalformedHints { message, .. } => {
+                assert!(
+                    message.contains('x'),
+                    "message does not name the field: {message}"
+                );
+            }
+            other => panic!("expected RasterError::MalformedHints, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_sidecar_naming_the_same_region_twice_is_refused() {
+        let error = read_temp_sidecar(
+            "duplicate-name",
+            "[[hint]]\nname = \"logo\"\nx = 0\ny = 0\nwidth = 10\nheight = 10\n\
+             [[hint]]\nname = \"logo\"\nx = 20\ny = 20\nwidth = 10\nheight = 10\n",
+        )
+        .expect_err("a duplicate region name is refused");
+        match error {
+            RasterError::DuplicateHintName { name, .. } => {
+                assert_eq!(name, "logo");
+            }
+            other => panic!("expected RasterError::DuplicateHintName, got {other:?}"),
+        }
+    }
 }
