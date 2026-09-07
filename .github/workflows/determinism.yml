@@ -66,10 +66,27 @@ jobs:
         shell: bash
         run: cargo build --release -p chrys-cli
 
-      - name: Run the digest report on the committed pair
+      - name: Run the digest report on the committed fixture pairs
         shell: bash
         run: |
+          set -euo pipefail
+
+          # tests/golden/pair-01 stays first, unprefixed, its four lines
+          # byte-identical to what phase 1 committed, so a reader who
+          # already knows this file still finds it opening the same way.
           cargo run -q --release -p chrys-cli -- compare tests/golden/pair-01/base.png tests/golden/pair-01/candidate.png --hash-only > digest.txt
+
+          echo "== tests/golden/sequence-01 ==" >> digest.txt
+          cargo run -q --release -p chrys-cli -- compare tests/golden/sequence-01/base tests/golden/sequence-01/candidate --hash-only >> digest.txt
+
+          echo "== tests/golden/formats/gif ==" >> digest.txt
+          cargo run -q --release -p chrys-cli -- compare tests/golden/formats/gif/base.gif tests/golden/formats/gif/candidate.gif --hash-only >> digest.txt
+
+          echo "== tests/golden/formats/apng ==" >> digest.txt
+          cargo run -q --release -p chrys-cli -- compare tests/golden/formats/apng/base.png tests/golden/formats/apng/candidate.png --hash-only >> digest.txt
+
+          echo "== tests/golden/formats/webp-anim ==" >> digest.txt
+          cargo run -q --release -p chrys-cli -- compare tests/golden/formats/webp-anim/base.webp tests/golden/formats/webp-anim/candidate.webp --hash-only >> digest.txt
 
       - name: Upload the digest report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -92,8 +109,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          digest_names=(decode-base decode-candidate residual verdict)
-
+          # A fixture added later must be covered without a further edit
+          # here, so this compares each runner's whole digest.txt against
+          # the first runner's, byte for byte, rather than reading a fixed
+          # set of line numbers. Byte comparison cannot miss a line the
+          # loop was never told about.
           labels=()
           files=()
           for dir in reports/digest-*; do
@@ -101,21 +121,14 @@ jobs:
             files+=("$dir/digest.txt")
           done
 
-          value_at() {
-            # value_at FILE LINE_NUMBER (1-indexed) prints the digest field
-            # on that line, dropping the leading label and the one space
-            # after it.
-            sed -n "${2}p" "$1" | cut -d' ' -f2-
-          }
+          reference_file="${files[0]}"
+          reference_label="${labels[0]}"
 
           disagreement=0
-          for line_number in 1 2 3 4; do
-            reference="$(value_at "${files[0]}" "$line_number")"
-            for file in "${files[@]}"; do
-              if [ "$(value_at "$file" "$line_number")" != "$reference" ]; then
-                disagreement=1
-              fi
-            done
+          for i in "${!files[@]}"; do
+            if ! cmp -s "$reference_file" "${files[$i]}"; then
+              disagreement=1
+            fi
           done
 
           if [ "$disagreement" -ne 0 ]; then
@@ -123,28 +136,15 @@ jobs:
             echo "portability bug in the comparison path, and a release"
             echo "blocker, not a flaky test to retry."
             echo
-            for i in "${!labels[@]}"; do
-              echo "== ${labels[$i]} =="
-              cat "${files[$i]}"
-            done
-            echo
-            for line_index in 0 1 2 3; do
-              line_number=$((line_index + 1))
-              name="${digest_names[$line_index]}"
-              for i in "${!files[@]}"; do
-                for j in "${!files[@]}"; do
-                  if [ "$i" -lt "$j" ]; then
-                    value_i="$(value_at "${files[$i]}" "$line_number")"
-                    value_j="$(value_at "${files[$j]}" "$line_number")"
-                    if [ "$value_i" != "$value_j" ]; then
-                      echo "disagreement on ${name}: ${labels[$i]} and ${labels[$j]} differ"
-                    fi
-                  fi
-                done
-              done
+            for i in "${!files[@]}"; do
+              if ! cmp -s "$reference_file" "${files[$i]}"; then
+                echo "== diff: ${reference_label} vs ${labels[$i]} =="
+                diff "$reference_file" "${files[$i]}" || true
+                echo
+              fi
             done
             exit 1
           fi
 
-          echo "All six runners agree on the four digests:"
-          cat "${files[0]}"
+          echo "All six runners agree on every digest:"
+          cat "$reference_file"
