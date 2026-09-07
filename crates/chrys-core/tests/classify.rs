@@ -14,7 +14,7 @@ use chrys_core::classify::{
     label_regions, suppress_antialiasing,
 };
 use chrys_core::register::{BlockOffset, ResidualField};
-use chrys_core::{BoundingBox, ChangeKind, Region};
+use chrys_core::{BoundingBox, ChangeKind, ColourDelta, Region};
 use chrys_source::Frame;
 
 fn empty_residual(width: usize, height: usize) -> ResidualField {
@@ -613,4 +613,47 @@ fn a_moved_regions_display_names_the_kind_the_bounding_box_and_the_offset_never_
     assert!(text.contains("Moved"));
     assert!(text.contains("(4, -2)"));
     assert!(!text.trim().chars().all(|c| c.is_ascii_digit()));
+}
+
+#[test]
+fn a_recoloured_regions_display_prints_the_alpha_delta_when_the_two_colours_differ_in_alpha() {
+    let region = Region {
+        kind: ChangeKind::Recoloured,
+        bbox: BoundingBox {
+            x: 5,
+            y: 5,
+            width: 10,
+            height: 10,
+        },
+        offset_px: None,
+        colour_delta: Some(ColourDelta {
+            delta_e: 0.0,
+            base: [200, 50, 50, 255],
+            candidate: [200, 50, 50, 128],
+        }),
+    };
+    let text = region.to_string();
+    assert!(text.contains("alpha delta 127"), "text was: {text}");
+}
+
+#[test]
+fn a_recoloured_regions_display_prints_no_alpha_delta_when_the_two_colours_share_alpha() {
+    let region = Region {
+        kind: ChangeKind::Recoloured,
+        bbox: BoundingBox {
+            x: 5,
+            y: 5,
+            width: 10,
+            height: 10,
+        },
+        offset_px: None,
+        colour_delta: Some(ColourDelta {
+            delta_e: 12.5,
+            base: [240, 240, 240, 255],
+            candidate: [10, 200, 10, 255],
+        }),
+    };
+    let text = region.to_string();
+    assert!(!text.contains("alpha delta"), "text was: {text}");
+    assert!(text.contains("colour delta 12.50"), "text was: {text}");
 }

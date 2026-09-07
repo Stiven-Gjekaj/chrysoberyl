@@ -28,6 +28,15 @@ impl fmt::Display for BoundingBox {
 }
 
 /// The colour difference between a base pixel and a candidate pixel.
+///
+/// `delta_e` covers colour only: Lab has no axis for alpha, and
+/// `classify::colour::colour_delta` drops it on purpose (see that
+/// function's own doc comment). The alpha difference between the same two
+/// pixels is derivable from `base` and `candidate` directly, at their own
+/// fourth bytes, and a rule engine reading this type, including Phase 3's
+/// tolerance-by-kind rule file, must read it there, not from `delta_e`, or
+/// a tolerance meant for colour would silently swallow an alpha-only
+/// change.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ColourDelta {
     /// The distance between the two colours: the Euclidean distance in
@@ -87,6 +96,14 @@ impl fmt::Display for Region {
                 ", colour delta {:.2} (base {:?}, candidate {:?})",
                 delta.delta_e, delta.base, delta.candidate
             )?;
+            // delta_e covers colour only (see ColourDelta's own doc
+            // comment); the alpha term is derived here, from the same two
+            // colours, and printed only when it is not zero, so no
+            // verdict text that exists today moves.
+            let alpha_delta = delta.base[3].abs_diff(delta.candidate[3]);
+            if alpha_delta != 0 {
+                write!(f, ", alpha delta {alpha_delta}")?;
+            }
         }
         Ok(())
     }
