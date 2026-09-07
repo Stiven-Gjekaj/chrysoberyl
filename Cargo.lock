@@ -142,6 +142,8 @@ version = "0.1.0"
 dependencies = [
  "chrys-core",
  "chrys-source",
+ "chrys-source-raster",
+ "image",
  "serde",
  "thiserror",
  "toml",

@@ -199,22 +199,31 @@ fn run_compare(
     }
 
     // A rule outcome is computed per frame, against that frame's own
-    // base-side hints, only when --rule was given. When it is absent this
-    // stays entirely unevaluated and the exit code below reads exactly as
-    // it did before this flag existed (CLI-03's regression guard).
-    let outcomes: Option<Vec<chrys_rule::RuleOutcome>> = rules.as_ref().map(|rules| {
-        verdicts
-            .iter()
-            .enumerate()
-            .map(|(index, verdict)| {
-                let hints = base_frames
-                    .get(index)
-                    .map(|frame| frame.hints.as_slice())
-                    .unwrap_or(&[]);
-                chrys_rule::evaluate(verdict, hints, rules)
-            })
-            .collect()
-    });
+    // base-side hints and size (the size is read only to check a
+    // mask-scoped rule's own mask against it), only when --rule was given.
+    // When it is absent this stays entirely unevaluated and the exit code
+    // below reads exactly as it did before this flag existed (CLI-03's
+    // regression guard).
+    let outcomes: Option<Vec<chrys_rule::RuleOutcome>> = rules
+        .as_ref()
+        .map(|rules| {
+            verdicts
+                .iter()
+                .enumerate()
+                .map(|(index, verdict)| {
+                    let hints = base_frames
+                        .get(index)
+                        .map(|frame| frame.hints.as_slice())
+                        .unwrap_or(&[]);
+                    let frame_size = base_frames
+                        .get(index)
+                        .map(|frame| (frame.width, frame.height))
+                        .unwrap_or((0, 0));
+                    chrys_rule::evaluate(verdict, hints, rules, frame_size)
+                })
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .transpose()?;
 
     let worst = verdicts
         .iter()

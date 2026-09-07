@@ -8,12 +8,14 @@
 //! crate is the reason that stays true: a rule file arrives from wherever
 //! the input pair arrived from, and its parser lives outside the engine.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 use toml::Spanned;
 
 pub mod evaluate;
+pub mod mask;
 
 pub use evaluate::{RegionOutcome, RuleOutcome, evaluate, overlapping_hint_name};
 
@@ -174,13 +176,27 @@ pub struct Rule {
 
 /// The rules loaded from one rule file.
 ///
-/// A mask-scoped rule's path is carried but not yet resolved to decoded
-/// pixels; a later plan fills this value in, at which point a bad mask
-/// path fails while the rule file loads, before any comparison runs, and
-/// `evaluate`'s own signature does not change.
+/// Every `Scope::Mask` path is resolved and decoded while the rule file
+/// loads, and its decoded pixels are stored here, beside the rules, keyed
+/// by the exact `PathBuf` a `Scope::Mask` rule carries. A rule file naming
+/// a missing, unreadable or path-unsafe mask fails inside `load_rules`,
+/// before any comparison runs, so a broken rule file never produces a
+/// partial verdict.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct LoadedRules {
     pub rules: Vec<Rule>,
+    masks: HashMap<PathBuf, mask::Mask>,
+}
+
+impl LoadedRules {
+    /// The decoded mask a `Scope::Mask(path)` rule carries, or `None` when
+    /// `path` names no mask this value loaded. Every `Scope::Mask` rule
+    /// `load_rules` itself produced has a matching entry here; `None` can
+    /// only happen for a `LoadedRules` a caller built by hand, such as a
+    /// test.
+    pub(crate) fn mask_for(&self, path: &Path) -> Option<&mask::Mask> {
+        self.masks.get(path)
+    }
 }
 
 /// Why a rule file failed to load.
@@ -233,6 +249,25 @@ pub enum RuleError {
     /// statements that contradict each other.
     #[error("{path} line {line}: `allow` cannot be combined with a numeric tolerance field")]
     ConflictingTolerance { path: PathBuf, line: usize },
+    /// A mask image named by a `Scope::Mask` rule could not be decoded:
+    /// missing, unreadable, not a supported format, or above the decode
+    /// limits (CLI-04). `path` is the resolved path this reader actually
+    /// tried to open.
+    #[error("cannot read mask {path}: {message}")]
+    MaskDecode { path: PathBuf, message: String },
+    /// A mask-scoped rule's own mask does not match the size of the frame
+    /// it is being applied against. Refused rather than scaled, cropped or
+    /// padded to fit (T-03-11).
+    #[error(
+        "mask {mask_path} is {mask_width}x{mask_height}, which does not match the {frame_width}x{frame_height} frame it is scoped against"
+    )]
+    MaskSizeMismatch {
+        mask_path: PathBuf,
+        mask_width: u32,
+        mask_height: u32,
+        frame_width: u32,
+        frame_height: u32,
+    },
 }
 
 /// Read and validate the rule file at `rule_path`.
@@ -270,7 +305,27 @@ pub fn load_rules(rule_path: &Path) -> Result<LoadedRules, RuleError> {
         rules.push(validate_row(rule_path, &text, spanned_row)?);
     }
 
-    Ok(LoadedRules { rules })
+    // Every `Scope::Mask` path is resolved and decoded here, while the
+    // rule file loads, so a rule file naming a missing or unreadable mask
+    // fails before any image is decoded and before any comparison runs
+    // (T-03-12). A mask named by more than one rule is decoded once: the
+    // map is keyed by the exact `PathBuf` a `Scope::Mask` rule carries, so
+    // a later lookup by that same value finds it.
+    let rule_dir = rule_path.parent().unwrap_or_else(|| Path::new("."));
+    let mut masks: HashMap<PathBuf, mask::Mask> = HashMap::new();
+    for rule in &rules {
+        if let Scope::Mask(mask_path) = &rule.scope {
+            if masks.contains_key(mask_path) {
+                continue;
+            }
+            let resolved = rule_dir.join(mask_path);
+            let decoded =
+                mask::load_mask(&resolved, &chrys_source_raster::DecodeLimits::default())?;
+            masks.insert(mask_path.clone(), decoded);
+        }
+    }
+
+    Ok(LoadedRules { rules, masks })
 }
 
 /// The line number (1-based) that byte offset `offset` of `text` falls on.

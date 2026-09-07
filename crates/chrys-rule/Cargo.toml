@@ -11,6 +11,10 @@ workspace = true
 [dependencies]
 chrys-core = { path = "../chrys-core" }
 chrys-source = { path = "../chrys-source" }
+chrys-source-raster = { path = "../chrys-source-raster" }
 toml.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+image = { workspace = true, features = ["png"] }

@@ -572,6 +572,72 @@ fn write_rule_01() {
     println!("wrote {}", candidate_path.display());
     println!("wrote {}", base_sidecar_path.display());
     println!("wrote {}", candidate_sidecar_path.display());
+
+    write_rule_01_masks(&out_dir);
+}
+
+/// Write `rule-01`'s two mask fixtures and the two mask-scoped rule files
+/// that read them, beside the pair `write_rule_01` already wrote.
+///
+/// `masks/badge.png` paints the same rectangle `RULE_01_REGION` names,
+/// fully white and opaque, over an otherwise transparent black canvas:
+/// the mask half of the same `badge` region the hints sidecar already
+/// names, so the recoloured rectangle it contains is tolerated the same
+/// way, by a different mechanism.
+///
+/// `masks/white-on-transparency.png` is the concrete failure D-02 exists
+/// to remove: the same canvas size, filled everywhere with the bytes 255,
+/// 255, 255, 0, and nothing painted on it. White on every colour channel,
+/// opaque nowhere. `mask-transparent.toml` names it and must exit 1, not
+/// 0: a mask ignoring alpha would tolerate the whole canvas silently, and
+/// this fixture is committed so that failure is checked by a test rather
+/// than believed.
+fn write_rule_01_masks(out_dir: &std::path::Path) {
+    let masks_dir = out_dir.join("masks");
+    std::fs::create_dir_all(&masks_dir)
+        .unwrap_or_else(|e| panic!("create {}: {e}", masks_dir.display()));
+
+    let mut badge_mask = RgbaImage::from_pixel(WIDTH, HEIGHT, Rgba([0, 0, 0, 0]));
+    let (mask_x, mask_y, mask_width, mask_height) = RULE_01_REGION;
+    paint_rect(
+        &mut badge_mask,
+        mask_x,
+        mask_y,
+        mask_width,
+        mask_height,
+        Rgba([255, 255, 255, 255]),
+    );
+    let badge_mask_path = masks_dir.join("badge.png");
+    badge_mask
+        .save(&badge_mask_path)
+        .unwrap_or_else(|e| panic!("write {}: {e}", badge_mask_path.display()));
+
+    let transparent_mask = RgbaImage::from_pixel(WIDTH, HEIGHT, Rgba([255, 255, 255, 0]));
+    let transparent_mask_path = masks_dir.join("white-on-transparency.png");
+    transparent_mask
+        .save(&transparent_mask_path)
+        .unwrap_or_else(|e| panic!("write {}: {e}", transparent_mask_path.display()));
+
+    println!("wrote {}", badge_mask_path.display());
+    println!("wrote {}", transparent_mask_path.display());
+
+    // The same kind and the same measured tolerance `tolerate.toml`
+    // already records (plan 03-01: the recoloured region's real, measured
+    // colour delta is 115.65; 116.0 sits just above it), scoped by a mask
+    // instead of a named region.
+    let mask_tolerate =
+        "[[rule]]\nkind = \"recoloured\"\nmask = \"masks/badge.png\"\nmax_delta_e = 116.0\n";
+    let mask_transparent = "[[rule]]\nkind = \"recoloured\"\nmask = \"masks/white-on-transparency.png\"\nmax_delta_e = 116.0\n";
+
+    let mask_tolerate_path = out_dir.join("mask-tolerate.toml");
+    let mask_transparent_path = out_dir.join("mask-transparent.toml");
+    std::fs::write(&mask_tolerate_path, mask_tolerate)
+        .unwrap_or_else(|e| panic!("write {}: {e}", mask_tolerate_path.display()));
+    std::fs::write(&mask_transparent_path, mask_transparent)
+        .unwrap_or_else(|e| panic!("write {}: {e}", mask_transparent_path.display()));
+
+    println!("wrote {}", mask_tolerate_path.display());
+    println!("wrote {}", mask_transparent_path.display());
 }
 
 fn golden_root() -> std::path::PathBuf {

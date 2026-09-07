@@ -7,9 +7,10 @@
 //! floating point comparison a colour tolerance needs lives in
 //! `Tolerance::tolerates` (`crate::lib`), which reads an already-computed
 //! `f32` field and compares it once; it introduces no new floating point
-//! calculation of its own.
+//! calculation of its own. `Mask::tolerates` (`crate::mask`) is `u64`
+//! integer arithmetic too, for the same reason.
 
-use crate::{LoadedRules, Rule, Scope};
+use crate::{LoadedRules, Rule, RuleError, Scope};
 
 /// Whether one region, under one rule set, was tolerated or is a
 /// violation.
@@ -87,35 +88,58 @@ pub fn overlapping_hint_name<'a>(
 }
 
 /// Whether `rule` tolerates `region`, given the hints available on the
-/// frame `region` was found on.
+/// frame `region` was found on, and that frame's own size (needed only to
+/// check a mask-scoped rule's mask against it).
 ///
-/// A rule never tolerates a region of a kind it does not name, and a
-/// mask-scoped rule matches nothing yet: mask decoding is not wired until
-/// a later plan fills `LoadedRules` with decoded masks, and this function
-/// never guesses in the meantime.
+/// A rule never tolerates a region of a kind it does not name. A
+/// mask-scoped rule reads its own decoded mask from `rules`, the same
+/// `LoadedRules` value `load_rules` already resolved and decoded every
+/// mask into while the rule file loaded (RULE-02's mask half); this
+/// function decodes nothing itself.
 fn rule_tolerates(
     rule: &Rule,
     region: &chrys_core::Region,
     hints: &[chrys_source::RegionHint],
-) -> bool {
+    rules: &LoadedRules,
+    frame_size: (u32, u32),
+) -> Result<bool, RuleError> {
     if rule.kind != region.kind {
-        return false;
+        return Ok(false);
     }
 
     let in_scope = match &rule.scope {
         Scope::Region(name) => overlapping_hint_name(&region.bbox, hints) == Some(name.as_str()),
-        Scope::Mask(_) => false,
+        Scope::Mask(mask_path) => {
+            let mask = rules.mask_for(mask_path).unwrap_or_else(|| {
+                panic!(
+                    "a Scope::Mask rule's own mask was not decoded by load_rules: {}",
+                    mask_path.display()
+                )
+            });
+            let (frame_width, frame_height) = frame_size;
+            if mask.width() != frame_width || mask.height() != frame_height {
+                return Err(RuleError::MaskSizeMismatch {
+                    mask_path: mask_path.clone(),
+                    mask_width: mask.width(),
+                    mask_height: mask.height(),
+                    frame_width,
+                    frame_height,
+                });
+            }
+            mask.tolerates(&region.bbox)
+        }
     };
     if !in_scope {
-        return false;
+        return Ok(false);
     }
 
-    rule.tolerance.tolerates(region)
+    Ok(rule.tolerance.tolerates(region))
 }
 
 /// Evaluate `verdict` against `rules`, using `hints` (the frame's own
 /// region hints, the same side the verdict's regions were found on) to
-/// resolve a region-scoped rule.
+/// resolve a region-scoped rule, and `frame_size` (that same frame's own
+/// width and height) to check a mask-scoped rule's mask against it.
 ///
 /// A `Changed` verdict produces one `RegionOutcome` per region, in the
 /// order `verdict` names them. An `Identical` verdict produces an empty
@@ -123,35 +147,42 @@ fn rule_tolerates(
 /// could not even decide whether this pair changed, and a rule tolerates
 /// a change, not a refusal, so a caller must not read that emptiness as a
 /// pass.
+///
+/// Returns `Err` only when a mask-scoped rule's own mask does not match
+/// `frame_size`: refusing rather than scaling, cropping or padding a mask
+/// that does not fit, the same posture `chrys_core::RefusalReason::DimensionMismatch`
+/// already takes for a pair of frames (T-03-11).
 pub fn evaluate(
     verdict: &chrys_core::Verdict,
     hints: &[chrys_source::RegionHint],
     rules: &LoadedRules,
-) -> RuleOutcome {
+    frame_size: (u32, u32),
+) -> Result<RuleOutcome, RuleError> {
     let regions = match verdict {
         chrys_core::Verdict::Changed { regions } => regions,
         chrys_core::Verdict::Identical | chrys_core::Verdict::Refused { .. } => {
-            return RuleOutcome {
+            return Ok(RuleOutcome {
                 regions: Vec::new(),
-            };
+            });
         }
     };
 
     let mut outcomes = Vec::with_capacity(regions.len());
     for region in regions {
-        let tolerated_by = rules
-            .rules
-            .iter()
-            .enumerate()
-            .find(|(_, rule)| rule_tolerates(rule, region, hints));
-
+        let mut tolerated_by = None;
+        for (rule_index, rule) in rules.rules.iter().enumerate() {
+            if rule_tolerates(rule, region, hints, rules, frame_size)? {
+                tolerated_by = Some(rule_index);
+                break;
+            }
+        }
         outcomes.push(match tolerated_by {
-            Some((rule_index, _)) => RegionOutcome::Tolerated { rule_index },
+            Some(rule_index) => RegionOutcome::Tolerated { rule_index },
             None => RegionOutcome::Violation,
         });
     }
 
-    RuleOutcome { regions: outcomes }
+    Ok(RuleOutcome { regions: outcomes })
 }
 
 #[cfg(test)]
@@ -160,6 +191,7 @@ mod tests {
     use crate::Tolerance;
     use chrys_core::{BoundingBox, ChangeKind, ColourDelta, Region, Verdict};
     use chrys_source::RegionHint;
+    use std::collections::HashMap;
 
     fn hint(name: &str, x: u32, y: u32, width: u32, height: u32) -> RegionHint {
         RegionHint {
@@ -178,6 +210,26 @@ mod tests {
             width,
             height,
         }
+    }
+
+    /// Write a flat-colour PNG to a fresh temporary path, decode it through
+    /// `crate::mask::load_mask`, remove the file, and return the decoded
+    /// mask. `label` keeps every temporary file this test module writes
+    /// from colliding with another test's own file.
+    fn temp_mask(
+        label: &str,
+        width: u32,
+        height: u32,
+        pixel: [u8; 4],
+    ) -> (std::path::PathBuf, crate::mask::Mask) {
+        let path = std::env::temp_dir().join(format!("chrys-rule-evaluate-test-{label}.png"));
+        image::RgbaImage::from_pixel(width, height, image::Rgba(pixel))
+            .save(&path)
+            .expect("write temp mask png");
+        let mask = crate::mask::load_mask(&path, &chrys_source_raster::DecodeLimits::default())
+            .expect("a well-formed PNG decodes");
+        std::fs::remove_file(&path).ok();
+        (path, mask)
     }
 
     #[test]
@@ -207,6 +259,7 @@ mod tests {
                     max_alpha_delta: 0,
                 },
             }],
+            ..Default::default()
         };
         let hints = vec![hint("badge", 0, 0, 100, 100)];
         let region = Region {
@@ -223,12 +276,154 @@ mod tests {
             regions: vec![region],
         };
 
-        let outcome = evaluate(&verdict, &hints, &rules);
+        let outcome = evaluate(&verdict, &hints, &rules, (100, 100)).expect("no mask involved");
         assert_eq!(
             outcome.regions,
             vec![RegionOutcome::Tolerated { rule_index: 0 }]
         );
         assert!(outcome.is_clean());
+    }
+
+    /// RULE-02's mask half: a rule scoped by a mask matches a region whose
+    /// box sits on tolerated (white and opaque) mask pixels, using the same
+    /// majority rule a named region already uses.
+    #[test]
+    fn mask_scoped_rule_matches_overlapping_region() {
+        let (mask_path, mask) = temp_mask("mask-scoped-match", 100, 100, [255, 255, 255, 255]);
+
+        let rule = Rule {
+            kind: ChangeKind::Recoloured,
+            scope: Scope::Mask(mask_path.clone()),
+            tolerance: Tolerance::Colour {
+                max_delta_e: 20.0,
+                max_alpha_delta: 0,
+            },
+        };
+        let mut masks = HashMap::new();
+        masks.insert(mask_path, mask);
+        let rules = LoadedRules {
+            rules: vec![rule],
+            masks,
+        };
+
+        let region = Region {
+            kind: ChangeKind::Recoloured,
+            bbox: bbox(10, 10, 20, 20),
+            offset_px: None,
+            colour_delta: Some(ColourDelta {
+                delta_e: 15.0,
+                base: [0, 0, 0, 255],
+                candidate: [10, 10, 10, 255],
+            }),
+        };
+        let verdict = Verdict::Changed {
+            regions: vec![region],
+        };
+
+        let outcome = evaluate(&verdict, &[], &rules, (100, 100)).expect("mask size agrees");
+        assert_eq!(
+            outcome.regions,
+            vec![RegionOutcome::Tolerated { rule_index: 0 }]
+        );
+        assert!(outcome.is_clean());
+    }
+
+    /// A mask-scoped rule never matches a region outside the mask's own
+    /// tolerated pixels, the mirror case of the match above.
+    #[test]
+    fn mask_scoped_rule_does_not_match_a_region_over_untolerated_pixels() {
+        // White on transparency: every pixel fails the alpha term of D-02,
+        // so nothing is tolerated anywhere on this mask.
+        let (mask_path, mask) = temp_mask("mask-scoped-no-match", 100, 100, [255, 255, 255, 0]);
+
+        let rule = Rule {
+            kind: ChangeKind::Recoloured,
+            scope: Scope::Mask(mask_path.clone()),
+            tolerance: Tolerance::Colour {
+                max_delta_e: 1_000.0,
+                max_alpha_delta: 255,
+            },
+        };
+        let mut masks = HashMap::new();
+        masks.insert(mask_path, mask);
+        let rules = LoadedRules {
+            rules: vec![rule],
+            masks,
+        };
+
+        let region = Region {
+            kind: ChangeKind::Recoloured,
+            bbox: bbox(10, 10, 20, 20),
+            offset_px: None,
+            colour_delta: Some(ColourDelta {
+                delta_e: 0.0,
+                base: [0, 0, 0, 255],
+                candidate: [1, 1, 1, 255],
+            }),
+        };
+        let verdict = Verdict::Changed {
+            regions: vec![region],
+        };
+
+        let outcome = evaluate(&verdict, &[], &rules, (100, 100)).expect("mask size agrees");
+        assert_eq!(outcome.regions, vec![RegionOutcome::Violation]);
+    }
+
+    /// A mask whose own size differs from the frame it is scoped against is
+    /// refused, naming both sizes, rather than scaled, cropped or padded to
+    /// fit (T-03-11).
+    #[test]
+    fn a_mask_sized_differently_from_the_frame_is_refused_naming_both_sizes() {
+        let (mask_path, mask) = temp_mask("mask-size-mismatch", 50, 50, [255, 255, 255, 255]);
+
+        let rule = Rule {
+            kind: ChangeKind::Recoloured,
+            scope: Scope::Mask(mask_path.clone()),
+            tolerance: Tolerance::Colour {
+                max_delta_e: 20.0,
+                max_alpha_delta: 0,
+            },
+        };
+        let mut masks = HashMap::new();
+        masks.insert(mask_path, mask);
+        let rules = LoadedRules {
+            rules: vec![rule],
+            masks,
+        };
+
+        let region = Region {
+            kind: ChangeKind::Recoloured,
+            bbox: bbox(10, 10, 20, 20),
+            offset_px: None,
+            colour_delta: Some(ColourDelta {
+                delta_e: 15.0,
+                base: [0, 0, 0, 255],
+                candidate: [10, 10, 10, 255],
+            }),
+        };
+        let verdict = Verdict::Changed {
+            regions: vec![region],
+        };
+
+        // The mask is 50x50; the frame is 100x100.
+        let error = evaluate(&verdict, &[], &rules, (100, 100))
+            .expect_err("a size mismatch between mask and frame is refused");
+        let message = error.to_string();
+        match error {
+            RuleError::MaskSizeMismatch {
+                mask_width,
+                mask_height,
+                frame_width,
+                frame_height,
+                ..
+            } => {
+                assert_eq!((mask_width, mask_height), (50, 50));
+                assert_eq!((frame_width, frame_height), (100, 100));
+                assert!(message.contains("50x50"), "message: {message}");
+                assert!(message.contains("100x100"), "message: {message}");
+            }
+            other => panic!("expected RuleError::MaskSizeMismatch, got {other:?}"),
+        }
     }
 
     #[test]
@@ -237,7 +432,7 @@ mod tests {
         let verdict = Verdict::Refused {
             reason: chrys_core::RefusalReason::EmptySequence,
         };
-        let outcome = evaluate(&verdict, &[], &rules);
+        let outcome = evaluate(&verdict, &[], &rules, (0, 0)).expect("no mask to check");
         assert!(outcome.regions.is_empty());
         // Empty is not a pass in the caller's own reading; this test only
         // proves evaluate() itself stays empty here, per its own doc
@@ -263,6 +458,7 @@ mod tests {
         };
         let rules = LoadedRules {
             rules: vec![moved_rule],
+            ..Default::default()
         };
         let within = Region {
             kind: ChangeKind::Moved,
@@ -276,7 +472,9 @@ mod tests {
             },
             &hints,
             &rules,
-        );
+            (100, 100),
+        )
+        .expect("no mask involved");
         assert_eq!(
             outcome.regions,
             vec![RegionOutcome::Tolerated { rule_index: 0 }]
@@ -293,7 +491,9 @@ mod tests {
             },
             &hints,
             &rules,
-        );
+            (100, 100),
+        )
+        .expect("no mask involved");
         assert_eq!(outcome.regions, vec![RegionOutcome::Violation]);
 
         // recoloured: at or below the colour limit tolerates.
@@ -307,6 +507,7 @@ mod tests {
         };
         let rules = LoadedRules {
             rules: vec![recoloured_rule],
+            ..Default::default()
         };
         let region = Region {
             kind: ChangeKind::Recoloured,
@@ -324,7 +525,9 @@ mod tests {
             },
             &hints,
             &rules,
-        );
+            (100, 100),
+        )
+        .expect("no mask involved");
         assert_eq!(
             outcome.regions,
             vec![RegionOutcome::Tolerated { rule_index: 0 }]
@@ -337,7 +540,10 @@ mod tests {
                 scope: Scope::Region("badge".to_string()),
                 tolerance: Tolerance::MaxAreaPx(500),
             };
-            let rules = LoadedRules { rules: vec![rule] };
+            let rules = LoadedRules {
+                rules: vec![rule],
+                ..Default::default()
+            };
             // 20 * 20 = 400, at or below the 500-pixel limit.
             let region = Region {
                 kind,
@@ -351,7 +557,9 @@ mod tests {
                 },
                 &hints,
                 &rules,
-            );
+                (100, 100),
+            )
+            .expect("no mask involved");
             assert_eq!(
                 outcome.regions,
                 vec![RegionOutcome::Tolerated { rule_index: 0 }],
@@ -367,6 +575,7 @@ mod tests {
         };
         let rules = LoadedRules {
             rules: vec![allow_rule],
+            ..Default::default()
         };
         let large_added_region = Region {
             kind: ChangeKind::Added,
@@ -380,7 +589,9 @@ mod tests {
             },
             &hints,
             &rules,
-        );
+            (100, 100),
+        )
+        .expect("no mask involved");
         assert_eq!(
             outcome.regions,
             vec![RegionOutcome::Tolerated { rule_index: 0 }]
@@ -395,6 +606,7 @@ mod tests {
         };
         let rules = LoadedRules {
             rules: vec![moved_only_rule],
+            ..Default::default()
         };
         let recoloured_region = Region {
             kind: ChangeKind::Recoloured,
@@ -412,7 +624,9 @@ mod tests {
             },
             &hints,
             &rules,
-        );
+            (100, 100),
+        )
+        .expect("no mask involved");
         assert_eq!(outcome.regions, vec![RegionOutcome::Violation]);
     }
 
@@ -430,14 +644,19 @@ mod tests {
             offset_px: None,
             colour_delta: None,
         };
-        let rules = LoadedRules { rules: vec![rule] };
+        let rules = LoadedRules {
+            rules: vec![rule],
+            ..Default::default()
+        };
         let outcome = evaluate(
             &Verdict::Changed {
                 regions: vec![region],
             },
             &hints,
             &rules,
-        );
+            (100, 100),
+        )
+        .expect("no mask involved");
         assert_eq!(outcome.regions, vec![RegionOutcome::Violation]);
     }
 
@@ -458,14 +677,19 @@ mod tests {
             offset_px: None,
             colour_delta: None,
         };
-        let rules = LoadedRules { rules: vec![rule] };
+        let rules = LoadedRules {
+            rules: vec![rule],
+            ..Default::default()
+        };
         let outcome = evaluate(
             &Verdict::Changed {
                 regions: vec![region],
             },
             &hints,
             &rules,
-        );
+            (100, 100),
+        )
+        .expect("no mask involved");
         assert_eq!(outcome.regions, vec![RegionOutcome::Violation]);
     }
 
@@ -494,14 +718,19 @@ mod tests {
                 candidate: [10, 20, 30, 0],
             }),
         };
-        let rules = LoadedRules { rules: vec![rule] };
+        let rules = LoadedRules {
+            rules: vec![rule],
+            ..Default::default()
+        };
         let outcome = evaluate(
             &Verdict::Changed {
                 regions: vec![region],
             },
             &hints,
             &rules,
-        );
+            (100, 100),
+        )
+        .expect("no mask involved");
         assert_eq!(outcome.regions, vec![RegionOutcome::Violation]);
     }
 }
