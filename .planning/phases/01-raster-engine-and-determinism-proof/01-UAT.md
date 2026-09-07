@@ -1,18 +1,19 @@
 ---
-status: partial
+status: complete
 phase: 01-raster-engine-and-determinism-proof
 source: 01-01-SUMMARY.md, 01-02-SUMMARY.md, 01-03-SUMMARY.md, 01-04-SUMMARY.md, 01-05-SUMMARY.md, 01-06-SUMMARY.md, 01-07-SUMMARY.md, 01-08-SUMMARY.md
 started: 2026-09-07T00:00:00Z
-updated: 2026-09-07T00:00:00Z
+updated: 2026-09-07T11:12:00Z
 ---
 
 ## Current Test
 
-[testing paused — 2 items need a person]
+[testing complete]
 
 Tests 1 to 11 were run by the orchestrator against the built binary, because every
-one of them is mechanically observable. Tests 12 and 13 are judgment calls that a
-measurement cannot settle, and they stay open for Stiven.
+one of them is mechanically observable. Tests 12 and 13 were judgment calls that a
+measurement cannot settle. Stiven read the live output of both on 2026-09-07 and
+accepted each without change.
 
 ## Tests
 
@@ -82,24 +83,27 @@ green on this commit
 
 ### 12. The verdict line is useful to a reviewer
 expected: a person reading one line knows what changed and whether it matters
-result: [pending]
-reason: only a person can judge whether `Recoloured region at x=64, y=64, width=96,
-height=64, colour delta 111.83` is the sentence they want, or whether it needs
-different fields, a different order, or a different name for the kind.
+result: pass
+observed: Stiven read the four live verdict shapes from the release binary and
+accepted them without change. The field order (kind, box, kind-specific detail),
+the CIE76 `colour delta` value, and the kind names `Recoloured`, `Moved` and
+`Added` are all confirmed. Phase 3 rules scope tolerance by these exact names.
 
 ### 13. The refusal message earns its trust
 expected: a person who sees a refusal understands it and does not simply raise the threshold
-result: [pending]
-reason: the wording is the whole defence against the failure mode this feature exists
-to prevent. A measurement cannot tell whether a reader accepts the refusal or works
-around it.
+result: pass
+observed: Stiven read the live refusal from all eight `should-refuse` pairs and
+accepted the wording without change. The closing clause `this engine compares
+near-identical pairs only` stays, the two confidence numbers stay, and the message
+offers no onward suggestion by design. The tool has no threshold flag, so the wording
+carries the whole defence, and it holds.
 
 ## Summary
 
 total: 13
-passed: 11
+passed: 13
 issues: 0
-pending: 2
+pending: 0
 skipped: 0
 blocked: 0
 
