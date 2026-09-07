@@ -15,6 +15,19 @@ use serde::Deserialize;
 
 use crate::RasterError;
 
+/// The largest `<stem>.hints.toml` this reader accepts, in bytes.
+///
+/// A sidecar names rectangles. The committed example names one region in
+/// under a hundred bytes, and a producer that names a thousand regions
+/// stays far below this number. One mebibyte is therefore a ceiling no
+/// real sidecar reaches, which is what makes it safe to refuse above it
+/// rather than read and hope the parser fails first.
+///
+/// This is the same posture `DecodeLimits` takes on the image path:
+/// bound the allocation before it happens, because the file comes from
+/// wherever the input file came from.
+pub const MAX_SIDECAR_BYTES: u64 = 1024 * 1024;
+
 /// The sidecar's own document shape: an array of tables named `hint`.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -61,6 +74,30 @@ impl From<HintRow> for RegionHint {
 /// answer.
 pub fn read_hints_sidecar(image_path: &Path) -> Result<Vec<RegionHint>, RasterError> {
     let sidecar_path = sidecar_path_for(image_path);
+
+    // Ask the file system for the size before reading the bytes. A read
+    // that starts before the size is known puts the whole file in memory
+    // whatever the parser later decides, which is the shape of the
+    // decompression-bomb class `DecodeLimits` already defends the image
+    // path against. The sidecar crosses the same boundary: it sits beside
+    // an input file, and whoever supplies the input supplies it too.
+    match std::fs::metadata(&sidecar_path) {
+        Ok(metadata) if metadata.len() > MAX_SIDECAR_BYTES => {
+            return Err(RasterError::HintsTooLarge {
+                path: sidecar_path,
+                size: metadata.len(),
+                limit: MAX_SIDECAR_BYTES,
+            });
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => {
+            return Err(RasterError::Io {
+                path: sidecar_path,
+                source: error,
+            });
+        }
+    }
 
     let text = match std::fs::read_to_string(&sidecar_path) {
         Ok(text) => text,
@@ -218,6 +255,71 @@ mod tests {
             }
             other => panic!("expected RasterError::MalformedHints, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn a_sidecar_larger_than_the_limit_is_refused_before_it_is_read() {
+        let dir = std::env::temp_dir();
+        let image_path = dir.join("chrys-hints-test-oversize.png");
+        let sidecar_path = dir.join("chrys-hints-test-oversize.hints.toml");
+
+        // One byte over the limit is enough. The test does not need a
+        // large file to prove the check runs, and a large file would make
+        // this test pay the cost the check exists to refuse.
+        let oversize = (MAX_SIDECAR_BYTES + 1) as usize;
+        let mut document = String::with_capacity(oversize);
+        document.push('#');
+        while document.len() < oversize {
+            document.push('a');
+        }
+        std::fs::write(&sidecar_path, &document).expect("write sidecar");
+        let written = std::fs::metadata(&sidecar_path)
+            .expect("stat sidecar")
+            .len();
+
+        let result = read_hints_sidecar(&image_path);
+        std::fs::remove_file(&sidecar_path).ok();
+
+        assert!(
+            written > MAX_SIDECAR_BYTES,
+            "the fixture must exceed the limit to test it: {written} bytes"
+        );
+        match result.expect_err("a sidecar over the limit is refused") {
+            RasterError::HintsTooLarge { size, limit, .. } => {
+                assert_eq!(size, written);
+                assert_eq!(limit, MAX_SIDECAR_BYTES);
+            }
+            other => panic!("expected RasterError::HintsTooLarge, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_sidecar_at_the_limit_is_still_read() {
+        // The boundary belongs to the accepted side. A test that only
+        // proves the refusal cannot tell a correct limit from one that
+        // refuses every sidecar.
+        let dir = std::env::temp_dir();
+        let image_path = dir.join("chrys-hints-test-at-limit.png");
+        let sidecar_path = dir.join("chrys-hints-test-at-limit.hints.toml");
+
+        let hint = "[[hint]]\nname = \"logo\"\nx = 10\ny = 20\nwidth = 30\nheight = 40\n";
+        let mut document = String::from(hint);
+        while document.len() < MAX_SIDECAR_BYTES as usize {
+            document.push('#');
+        }
+        document.truncate(MAX_SIDECAR_BYTES as usize);
+        std::fs::write(&sidecar_path, &document).expect("write sidecar");
+        let written = std::fs::metadata(&sidecar_path)
+            .expect("stat sidecar")
+            .len();
+
+        let result = read_hints_sidecar(&image_path);
+        std::fs::remove_file(&sidecar_path).ok();
+
+        assert_eq!(written, MAX_SIDECAR_BYTES);
+        let hints = result.expect("a sidecar exactly at the limit is read");
+        assert_eq!(hints.len(), 1);
+        assert_eq!(hints[0].name, "logo");
     }
 
     #[test]

@@ -138,6 +138,23 @@ pub enum RasterError {
         /// The region name the sidecar declared more than once.
         name: String,
     },
+    /// The sidecar is larger than the reader accepts.
+    ///
+    /// A sidecar names rectangles. A file of rectangles does not reach a
+    /// megabyte, so a file that does is not a sidecar this crate must
+    /// read. Refusing by size before the read is what keeps an oversized
+    /// file from reaching memory at all.
+    #[error(
+        "{path} is {size} bytes, which exceeds the sidecar limit of {limit} bytes; a hints file names rectangles and does not reach this size"
+    )]
+    HintsTooLarge {
+        /// The sidecar that exceeded the limit.
+        path: PathBuf,
+        /// The size the file system reports for the sidecar.
+        size: u64,
+        /// The limit that was exceeded.
+        limit: u64,
+    },
 }
 
 impl Source for RasterSource {
