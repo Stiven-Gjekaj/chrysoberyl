@@ -44,8 +44,8 @@ release. See ROADMAP.md for the order.
 ### Input Sources
 
 - [x] **SRC-01**: A raster image pair is compared (PNG, JPEG, WebP, TIFF)
-- [ ] **SRC-02**: A numbered frame sequence pair is compared frame by frame
-- [ ] **SRC-03**: An animation pair is compared frame by frame (GIF, APNG,
+- [x] **SRC-02**: A numbered frame sequence pair is compared frame by frame
+- [x] **SRC-03**: An animation pair is compared frame by frame (GIF, APNG,
       animated WebP)
 - [ ] **SRC-04**: An SVG pair is rasterized on the CPU and compared
 - [ ] **SRC-05**: A PDF page pair is compared, behind a Cargo feature that is
@@ -54,9 +54,9 @@ release. See ROADMAP.md for the order.
       and not by frame index, behind a Cargo feature that is off by default
 - [ ] **SRC-07**: A 3D mesh pair is compared through a fixed eight-view rig,
       and the report names the blind spot the rig leaves
-- [ ] **SRC-08**: A new input family is added without a change to any code in
+- [x] **SRC-08**: A new input family is added without a change to any code in
       the comparison engine
-- [ ] **SRC-09**: An input source can supply named regions as a hint, and the
+- [x] **SRC-09**: An input source can supply named regions as a hint, and the
       engine registers inside a named region instead of searching for it
 
 ### Rules and Tolerance
@@ -147,10 +147,10 @@ release. See ROADMAP.md for the order.
 | DET-04 | Phase 1 | Complete |
 | DET-06 | Phase 1 | Complete |
 | SRC-01 | Phase 1 | Complete |
-| SRC-02 | Phase 2 | Pending |
-| SRC-03 | Phase 2 | Pending |
-| SRC-08 | Phase 2 | Pending |
-| SRC-09 | Phase 2 | Pending |
+| SRC-02 | Phase 2 | Complete |
+| SRC-03 | Phase 2 | Complete |
+| SRC-08 | Phase 2 | Complete |
+| SRC-09 | Phase 2 | Complete |
 | RULE-01 | Phase 3 | Pending |
 | RULE-02 | Phase 3 | Pending |
 | RULE-03 | Phase 3 | Pending |

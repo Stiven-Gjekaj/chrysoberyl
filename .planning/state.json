@@ -11,7 +11,7 @@
     {
       "number": "2",
       "name": "Source trait and a second format",
-      "status": "in_progress"
+      "status": "complete"
     },
     {
       "number": "3",
@@ -46,8 +46,8 @@
   ],
   "next": {
     "command": "/gsd:progress --next",
-    "label": "Advance to the next step (plan phase 02)",
-    "reason": "Phase 02 of 8 — needs a plan"
+    "label": "Advance to the next step (plan phase 3)",
+    "reason": "Phase 3 of 8 — needs a plan"
   },
-  "updated_at": "2026-09-07T11:26:01.696Z"
+  "updated_at": "2026-09-07T13:43:33.947Z"
 }
