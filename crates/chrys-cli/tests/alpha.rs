@@ -10,7 +10,7 @@ fn repo_root() -> PathBuf {
 }
 
 #[test]
-fn an_alpha_only_difference_is_not_reported_identical() {
+fn an_alpha_only_difference_is_reported_removed_with_the_measured_bounding_box() {
     let pair_dir = repo_root().join("tests/golden/alpha-01");
     let output = Command::new(env!("CARGO_BIN_EXE_chrys"))
         .arg("compare")
@@ -28,6 +28,13 @@ fn an_alpha_only_difference_is_not_reported_identical() {
     assert!(
         !stdout.to_lowercase().contains("identical"),
         "an alpha-only difference must not be reported identical: {stdout}"
+    );
+    // The base holds rectangle content where the candidate is fully
+    // transparent, so the exact kind, not merely "not the same", is
+    // Removed.
+    assert!(
+        stdout.contains("Removed"),
+        "expected the Removed kind: {stdout}"
     );
     assert!(
         stdout.contains("x=48, y=48, width=24, height=20"),

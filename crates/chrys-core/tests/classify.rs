@@ -439,6 +439,17 @@ fn region_at(x: u32, y: u32, width: u32, height: u32) -> LabelledRegion {
 const KIND_BG: [u8; 4] = [50, 50, 50, 255];
 const KIND_FG: [u8; 4] = [200, 50, 50, 255];
 
+/// Set the fourth byte of every pixel inside `x, y, width, height` to
+/// `alpha`, leaving every other byte untouched.
+fn set_rect_alpha(pixels: &mut [u8], stride: u32, x: u32, y: u32, width: u32, height: u32, alpha: u8) {
+    for row in y..y + height {
+        for col in x..x + width {
+            let idx = ((row * stride + col) * 4) as usize;
+            pixels[idx + 3] = alpha;
+        }
+    }
+}
+
 #[test]
 fn colour_delta_on_two_identical_colours_returns_a_zero_difference_and_both_colours_unchanged() {
     let colour = [120, 60, 200, 255];
@@ -490,6 +501,48 @@ fn classify_kind_on_a_region_background_in_the_candidate_and_content_in_the_base
     assert_eq!(kind, ChangeKind::Removed);
     assert_eq!(offset, None);
     assert_eq!(delta, None);
+}
+
+#[test]
+fn classify_kind_on_content_that_becomes_fully_transparent_returns_removed() {
+    let mut base = solid_colour_frame(20, 20, KIND_BG);
+    paint_rect_colour(&mut base.pixels, 20, 5, 5, 10, 10, KIND_FG);
+    let mut candidate = base.clone();
+    set_rect_alpha(&mut candidate.pixels, 20, 5, 5, 10, 10, 0);
+    let region = region_at(5, 5, 10, 10);
+    let (kind, offset, delta) = classify_kind(&region, &base, &candidate, &[]);
+    assert_eq!(kind, ChangeKind::Removed);
+    assert_eq!(offset, None);
+    assert_eq!(delta, None);
+}
+
+#[test]
+fn classify_kind_on_content_that_arrives_from_full_transparency_returns_added() {
+    let mut base = solid_colour_frame(20, 20, KIND_BG);
+    set_rect_alpha(&mut base.pixels, 20, 5, 5, 10, 10, 0);
+    let mut candidate = solid_colour_frame(20, 20, KIND_BG);
+    paint_rect_colour(&mut candidate.pixels, 20, 5, 5, 10, 10, KIND_FG);
+    let region = region_at(5, 5, 10, 10);
+    let (kind, offset, delta) = classify_kind(&region, &base, &candidate, &[]);
+    assert_eq!(kind, ChangeKind::Added);
+    assert_eq!(offset, None);
+    assert_eq!(delta, None);
+}
+
+#[test]
+fn classify_kind_on_a_partial_alpha_change_returns_recoloured() {
+    let mut base = solid_colour_frame(20, 20, KIND_BG);
+    paint_rect_colour(&mut base.pixels, 20, 5, 5, 10, 10, KIND_FG);
+    let mut candidate = base.clone();
+    set_rect_alpha(&mut candidate.pixels, 20, 5, 5, 10, 10, 128);
+    let region = region_at(5, 5, 10, 10);
+    let (kind, offset, delta) = classify_kind(&region, &base, &candidate, &[]);
+    assert_eq!(kind, ChangeKind::Recoloured);
+    assert_eq!(offset, None);
+    assert!(
+        delta.is_some(),
+        "a partial alpha change still reaches the recoloured fall-through"
+    );
 }
 
 #[test]

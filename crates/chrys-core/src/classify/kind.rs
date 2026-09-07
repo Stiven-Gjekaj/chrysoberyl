@@ -13,9 +13,9 @@ use crate::classify::label::LabelledRegion;
 use crate::register::block_match::{BLOCK_SIDE, BlockOffset};
 use crate::verdict::{BoundingBox, ChangeKind, ColourDelta};
 
-/// The fraction of a region's own bounding box that must equal the
-/// frame's modal colour for that region to count as background in that
-/// frame.
+/// The fraction of a region's own bounding box that must either equal the
+/// frame's modal colour or be fully transparent for that region to count
+/// as absent from that frame.
 pub const BACKGROUND_FRACTION: f32 = 0.9;
 
 /// The fraction by which a region's non-background pixel count may
@@ -28,23 +28,23 @@ pub const RESIZE_FRACTION: f32 = 0.2;
 ///
 /// This function computes the frame's own background colour once, as the
 /// modal RGBA value over `base`, and reuses that one value to decide
-/// whether `region`'s own pixels count as background in either frame. The
+/// whether `region`'s own pixels count as absent from either frame. The
 /// ordered decision list:
 ///
-/// One, the region is background in `base` and not in `candidate`, so it
+/// One, the region is absent from `base` and not from `candidate`, so it
 /// is `Added`. Two, the reverse, so it is `Removed`. Three, both frames
-/// hold content, but the non-background pixel count inside the bounding
-/// box differs by more than `RESIZE_FRACTION` while the majority block
-/// offset is zero, so it is `Resized`. Four, the majority block offset
-/// over the blocks intersecting the bounding box is non-zero, so it is
-/// `Moved`, and that offset is the reported offset in pixels. Five, the
-/// fall-through is `Recoloured`: a region that reached the residual and
-/// matches none of the first four differs in colour by definition, so
-/// `Recoloured` is the honest default here rather than an unnamed sixth
-/// category. Its colour delta is the difference between the mean colour
-/// of the region's own bounding box in each frame; `LabelledRegion` does
-/// not carry the region's own pixel mask, so the bounding box is the
-/// closest data this function has to "the region."
+/// hold content, but the present pixel count inside the bounding box
+/// differs by more than `RESIZE_FRACTION` while the majority block offset
+/// is zero, so it is `Resized`. Four, the majority block offset over the
+/// blocks intersecting the bounding box is non-zero, so it is `Moved`, and
+/// that offset is the reported offset in pixels. Five, the fall-through is
+/// `Recoloured`: a region that reached the residual and matches none of
+/// the first four differs in colour by definition, so `Recoloured` is the
+/// honest default here rather than an unnamed sixth category. Its colour
+/// delta is the difference between the mean colour of the region's own
+/// bounding box in each frame; `LabelledRegion` does not carry the
+/// region's own pixel mask, so the bounding box is the closest data this
+/// function has to "the region."
 pub fn classify_kind(
     region: &LabelledRegion,
     base: &Frame,
@@ -54,13 +54,13 @@ pub fn classify_kind(
     let background = frame_background(base);
     let bbox = region.bbox;
 
-    let base_is_background = is_region_background(base, &bbox, background);
-    let candidate_is_background = is_region_background(candidate, &bbox, background);
+    let base_is_absent = is_region_absent(base, &bbox, background);
+    let candidate_is_absent = is_region_absent(candidate, &bbox, background);
 
-    if base_is_background && !candidate_is_background {
+    if base_is_absent && !candidate_is_absent {
         return (ChangeKind::Added, None, None);
     }
-    if !base_is_background && candidate_is_background {
+    if !base_is_absent && candidate_is_absent {
         return (ChangeKind::Removed, None, None);
     }
 
@@ -69,8 +69,8 @@ pub fn classify_kind(
         return (ChangeKind::Moved, Some(offset), None);
     }
 
-    let base_count = non_background_count(base, &bbox, background);
-    let candidate_count = non_background_count(candidate, &bbox, background);
+    let base_count = present_count(base, &bbox, background);
+    let candidate_count = present_count(candidate, &bbox, background);
     let larger = base_count.max(candidate_count).max(1) as f32;
     let difference = base_count.abs_diff(candidate_count) as f32;
     if difference / larger > RESIZE_FRACTION {
@@ -102,27 +102,43 @@ fn frame_background(frame: &Frame) -> [u8; 4] {
         .unwrap_or([0, 0, 0, 0])
 }
 
+/// Return true when `pixel` counts as absent from a frame whose modal
+/// colour is `background`: either it equals that modal colour, or it is
+/// fully transparent.
+///
+/// This is not a new special case grafted onto the background test; it
+/// completes the concept the two rules already used. A straight-alpha
+/// pixel with an alpha of zero contributes nothing to any composite over
+/// any background, so it is absent by the definition of the pixel format,
+/// on every page it is placed on, independent of whatever colour bytes sit
+/// under it. On a fully opaque frame no pixel's alpha is ever zero, so
+/// this predicate reduces exactly to the old equality test, and no
+/// existing verdict moves.
+fn is_pixel_absent(pixel: [u8; 4], background: [u8; 4]) -> bool {
+    pixel == background || pixel[3] == 0
+}
+
 /// Return true when at least `BACKGROUND_FRACTION` of `bbox`'s pixels in
-/// `frame` equal `background`.
-fn is_region_background(frame: &Frame, bbox: &BoundingBox, background: [u8; 4]) -> bool {
-    let (matches, total) = count_matches(frame, bbox, background);
+/// `frame` count as absent, by `is_pixel_absent`.
+fn is_region_absent(frame: &Frame, bbox: &BoundingBox, background: [u8; 4]) -> bool {
+    let (absent, total) = count_absent(frame, bbox, background);
     if total == 0 {
         return false;
     }
-    (matches as f32 / total as f32) >= BACKGROUND_FRACTION
+    (absent as f32 / total as f32) >= BACKGROUND_FRACTION
 }
 
-/// The number of pixels inside `bbox`, in `frame`, that do not equal
-/// `background`.
-fn non_background_count(frame: &Frame, bbox: &BoundingBox, background: [u8; 4]) -> usize {
-    let (matches, total) = count_matches(frame, bbox, background);
-    total - matches
+/// The number of pixels inside `bbox`, in `frame`, that do not count as
+/// absent, by `is_pixel_absent`.
+fn present_count(frame: &Frame, bbox: &BoundingBox, background: [u8; 4]) -> usize {
+    let (absent, total) = count_absent(frame, bbox, background);
+    total - absent
 }
 
-fn count_matches(frame: &Frame, bbox: &BoundingBox, colour: [u8; 4]) -> (usize, usize) {
+fn count_absent(frame: &Frame, bbox: &BoundingBox, background: [u8; 4]) -> (usize, usize) {
     let pixels = frame.rgba8();
     let width = frame.width;
-    let mut matches = 0usize;
+    let mut absent = 0usize;
     let mut total = 0usize;
     for y in bbox.y..bbox.y + bbox.height {
         for x in bbox.x..bbox.x + bbox.width {
@@ -133,13 +149,13 @@ fn count_matches(frame: &Frame, bbox: &BoundingBox, colour: [u8; 4]) -> (usize, 
                 pixels[idx + 2],
                 pixels[idx + 3],
             ];
-            if pixel == colour {
-                matches += 1;
+            if is_pixel_absent(pixel, background) {
+                absent += 1;
             }
             total += 1;
         }
     }
-    (matches, total)
+    (absent, total)
 }
 
 /// The mean RGBA colour over every pixel inside `bbox`, in `frame`.
