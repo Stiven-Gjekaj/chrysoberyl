@@ -71,6 +71,7 @@ fn main() {
     write_hint_01();
     write_alpha_01();
     write_rule_01();
+    write_example_rules_mask();
 }
 
 /// Write the first committed pair, read by plan 01-03. Its bytes must not
@@ -646,4 +647,40 @@ fn golden_root() -> std::path::PathBuf {
         .join("..")
         .join("tests")
         .join("golden")
+}
+
+/// The repository's `examples/rules` directory, resolved from
+/// `CARGO_MANIFEST_DIR` the same way `golden_root` resolves
+/// `tests/golden`, rather than from the process's current directory.
+fn examples_rules_root() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("examples")
+        .join("rules")
+}
+
+/// The narrow vertical stripe painted onto `masks/scrollbar-track.png`:
+/// `(x, y, width, height)`. A scrollbar track is tall and thin, so this
+/// mask's own drawn area is too.
+const SCROLLBAR_TRACK_STRIPE: (u32, u32, u32, u32) = (44, 4, 8, 56);
+
+/// Write `examples/rules/masks/scrollbar-track.png`, the mask
+/// `examples/rules/example.toml` names: a small canvas of transparent
+/// black with one narrow vertical white, opaque stripe, which is what a
+/// scrollbar track looks like as a mask (RULE-04).
+fn write_example_rules_mask() {
+    let out_dir = examples_rules_root().join("masks");
+    std::fs::create_dir_all(&out_dir)
+        .unwrap_or_else(|e| panic!("create {}: {e}", out_dir.display()));
+
+    let mut mask = RgbaImage::from_pixel(64, 64, Rgba([0, 0, 0, 0]));
+    let (x, y, width, height) = SCROLLBAR_TRACK_STRIPE;
+    paint_rect(&mut mask, x, y, width, height, Rgba([255, 255, 255, 255]));
+
+    let mask_path = out_dir.join("scrollbar-track.png");
+    mask.save(&mask_path)
+        .unwrap_or_else(|e| panic!("write {}: {e}", mask_path.display()));
+
+    println!("wrote {}", mask_path.display());
 }

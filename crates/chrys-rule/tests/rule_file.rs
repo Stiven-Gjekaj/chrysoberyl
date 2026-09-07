@@ -248,3 +248,38 @@ fn rule_row_has_no_computable_field() {
          field appears."
     );
 }
+
+/// RULE-04: the shipped example shows a scoped exclusion and never a bare
+/// global threshold. This test asserts only two properties: the file
+/// parses, and every rule it holds carries a scope. It does not assert a
+/// tolerance value, a region name, or an exact rule count, because this is
+/// the one place in this phase where a test reads a file the author edits
+/// (AGENTS.md's own "What a test can hold on to" warns against exactly
+/// that), and an author who improves the example's wording or its numbers
+/// must not also have to update this test.
+#[test]
+fn the_shipped_example_rule_file_parses_and_is_fully_scoped() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let example_path = repo_root.join("examples/rules/example.toml");
+
+    let loaded = load_rules(&example_path)
+        .unwrap_or_else(|error| panic!("{} failed to load: {error}", example_path.display()));
+
+    assert!(
+        loaded.rules.len() >= 2,
+        "the shipped example should hold at least two rules, a region-scoped one and a \
+         mask-scoped one, but it loaded {}",
+        loaded.rules.len()
+    );
+
+    // `Rule::scope` has no `Option` variant (D-01): a rule with no scope
+    // cannot be represented at all, so every loaded rule already carries
+    // one. This assertion documents that property rather than testing
+    // anything new; it exists so a future reader who removes D-01's
+    // type-level guard sees this test still name the requirement.
+    for rule in &loaded.rules {
+        match &rule.scope {
+            chrys_rule::Scope::Region(_) | chrys_rule::Scope::Mask(_) => {}
+        }
+    }
+}

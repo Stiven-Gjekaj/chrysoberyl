@@ -1,0 +1,54 @@
+# This is an example rule file for chrys compare --rule.
+#
+# A rule always names a scope: a named region, or a mask image. Chrys does
+# not accept a rule with no scope. A rule cannot apply to a whole frame.
+# This is a deliberate limit, not a missing feature. A rule that could
+# apply to a whole frame could hide a regression under a single generous
+# threshold, and a small change anywhere on the frame would pass. Every
+# rule here names the exact area it applies to, and nothing outside that
+# area is tolerated by it.
+
+# A region-scoped rule.
+#
+# "badge" is not a rectangle written in this file. It is a name. To make
+# that name exist, a producer writes a `<stem>.hints.toml` file beside its
+# image, naming the rectangle:
+#
+#   [[hint]]
+#   name = "badge"
+#   x = 30
+#   y = 30
+#   width = 70
+#   height = 60
+#
+# Chrys reads that sidecar and resolves "badge" to the rectangle it names.
+# This rule then tolerates a recoloured change inside that rectangle, up to
+# a colour difference of 12.0 (measured as CIEDE2000 delta E) and an alpha
+# difference of up to 4, out of 255.
+[[rule]]
+kind = "recoloured"
+region = "badge"
+max_delta_e = 12.0
+max_alpha_delta = 4
+
+# A mask-scoped rule.
+#
+# A mask is an image, not a rectangle. Use a mask for an area no rectangle
+# describes, such as a rounded shape or a curve. "scrollbar-track.png"
+# names an image beside this file. A pixel in that image counts as
+# tolerated only when it is white on every colour channel and fully
+# opaque. Anything else, including a pixel that is white but only
+# partly opaque, does not count.
+#
+# This last point matters. A mask drawn as white on a transparent
+# background is white everywhere and opaque nowhere. Such a mask
+# tolerates nothing at all, because opacity, not colour, is what marks a
+# pixel as drawn. Draw the tolerated area as solid white on a solid,
+# fully opaque background, or the mask will silently tolerate nothing.
+#
+# This rule tolerates a region moving inside the mask's own drawn area, by
+# up to 3 pixels on each axis.
+[[rule]]
+kind = "moved"
+mask = "masks/scrollbar-track.png"
+max_offset_px = 3
