@@ -5,6 +5,9 @@ status: verified
 # threats_open = count of OPEN threats at or above workflow.security_block_on severity (the blocking gate)
 threats_open: 0
 asvs_level: 1
+# One medium threat, T-03-11, was reopened after this file was first
+# written. It is below the `high` blocking threshold, so threats_open
+# stays 0, but it is open and the register says so.
 created: "2026-09-07"
 ---
 
@@ -60,7 +63,7 @@ every plan with a per-plan mitigation; it is listed once.
 | T-03-08 | Information Disclosure | the `mask` path | high | mitigate | **Driven end to end.** `mask = "../../../../../../etc/passwd"` and `mask = "/etc/passwd"` are both refused with exit 3, and the message names both the offending path and the directory it left. A lexical check refuses an absolute path and any parent component before a file is opened; a canonical check refuses a symlink that reaches outside. | closed |
 | T-03-09 | Denial of Service | `load_mask` | high | mitigate | The mask decodes through `decode_guarded` with `DecodeLimits`, the same CVE-2023-29408-class mitigation every other decode carries, and a named test proves the limit is applied rather than assumed. | closed |
 | T-03-10 | Tampering | the mask membership rule | high | mitigate | **Driven end to end.** A mask of opaque white tolerates and exits 0. The committed `white-on-transparency.png` fixture does NOT tolerate and exits 1. Had the convention read colour only, that second mask would have silenced every change in the frame with no error anywhere. See Decisions below. | closed |
-| T-03-11 | Spoofing | a mask of the wrong size | medium | mitigate | A size mismatch is refused with both sizes named. No scaling, cropping or padding happens anywhere, so a mask cannot tolerate an area its author never drew. | closed |
+| T-03-11 | Spoofing | a mask of the wrong size | medium | **OPEN** | The control exists in the source (`evaluate.rs:120` returns `MaskSizeMismatch`), but the orchestrator could not make it fire. A 10x10 mask against a 256x256 frame produced a verdict and exit 1 with nothing on stderr, and a second run of the same shape produced exit 2 and no report. Neither named a size. **This threat is reopened. See the correction below.** | open |
 | T-03-12 | Denial of Service | a partly applied rule file | medium | mitigate | `load_rules` decodes every mask while the file loads, so a rule file whose third mask is missing fails before any image is decoded and no partial verdict is produced. | closed |
 | T-03-13 | Elevation of Privilege | `chrys-rule` reaching a format crate | medium | mitigate | `chrys-rule` depends on `chrys-source-raster`, which holds a format decoder. The direction is the control: `chrys-core` depends on neither. The check reads the resolved tree rather than the declared list, because phase 1 recorded a re-export carrying a banned dependency past a manifest check. | closed |
 | T-03-14 | Denial of Service | a future unguarded decode call site | high | mitigate | A static guard asserts every direct reader call site is one of two allow-listed files, with exact counts. **Drilled red twice**: an unexpected call site planted in `chrys-rule/src/mask.rs` made the guard name that file, and a deleted call site failed the count assertion `left: 1, right: 2`. | closed |
@@ -81,6 +84,33 @@ every plan with a per-plan mitigation; it is listed once.
 *Status: open · closed · open — below high threshold (non-blocking)*
 *Severity: critical > high > medium > low — only open threats at or above `workflow.security_block_on` (high) count toward `threats_open`*
 *Disposition: mitigate (implementation required) · accept (documented risk) · transfer (third-party)*
+
+---
+
+## A correction to this file, made after it was written
+
+**T-03-11 is reopened.** This file first recorded it as closed, on the strength
+of reading the control in the source. The control is there:
+`evaluate.rs:120` compares the mask's own size to the frame's and returns
+`RuleError::MaskSizeMismatch` naming both. Reading it was not enough.
+
+Driving it produced two results that do not match the claim, and do not match
+each other:
+
+- A 10x10 mask against a 256x256 frame, with no region flag: a verdict on
+  stdout, exit 1, nothing on stderr. No size was named.
+- The same shape, run again with `--report`: exit 2, and no report file
+  written at all.
+
+The orchestrator could not explain either result by inspection, and stopped
+rather than keep guessing. What is certain is that the claim this file made,
+"a size mismatch is refused with both sizes named", is not what the built
+binary does. The threat is open, its severity is medium so it does not block
+the phase, and the verification report carries it forward.
+
+This is recorded rather than quietly amended because the failure here is the
+one this project names most often: a control that exists in the source, is
+read, and is certified without being run.
 
 ---
 
@@ -165,7 +195,7 @@ Stated so no reader credits this file with more than it did.
 
 | Audit Date | Threats Total | Closed | Open | Run By |
 |------------|---------------|--------|------|--------|
-| 2026-09-07 | 27 | 27 (22 mitigated, 5 accepted) | 0 | orchestrator, ASVS L1 |
+| 2026-09-07 | 27 | 26 (21 mitigated, 5 accepted) | 1 (T-03-11, medium, below the blocking threshold) | orchestrator, ASVS L1 |
 
 Live evidence collected on 2026-09-07 against commit `ca6cf94`:
 
@@ -189,7 +219,7 @@ Live evidence collected on 2026-09-07 against commit `ca6cf94`:
 
 - [x] All threats have a disposition (mitigate / accept / transfer)
 - [x] Accepted risks documented in Accepted Risks Log
-- [x] `threats_open: 0` confirmed
+- [x] `threats_open: 0` confirmed, counting threats at or above `high`. One medium threat, T-03-11, is open.
 - [x] `status: verified` set in frontmatter
 
 **Approval:** verified 2026-09-07
