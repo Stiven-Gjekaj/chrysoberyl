@@ -41,6 +41,22 @@ enum Command {
         /// unmodified comparison runs.
         #[arg(long)]
         region: Option<String>,
+
+        /// Print a line for every frame of a sequence, including the
+        /// frames that did not change.
+        ///
+        /// By default a sequence prints only the frames that changed and
+        /// closes with a count of the frames that did not. A hundred
+        /// frames with five changes printed two hundred lines, of which
+        /// five carried a verdict, and a reader found the five only by
+        /// piping the output through another tool. This flag returns that
+        /// shape for a caller that already parses it.
+        ///
+        /// This flag does not affect `--hash-only`, which always reports
+        /// every frame: the digest report is the determinism evidence and
+        /// it must not depend on which frames happened to change.
+        #[arg(long)]
+        all_frames: bool,
     },
 }
 
@@ -63,7 +79,8 @@ fn run() -> anyhow::Result<ExitCode> {
             candidate,
             hash_only,
             region,
-        } => run_compare(&base, &candidate, hash_only, region.as_deref()),
+            all_frames,
+        } => run_compare(&base, &candidate, hash_only, region.as_deref(), all_frames),
     }
 }
 
@@ -72,6 +89,7 @@ fn run_compare(
     candidate_path: &Path,
     hash_only: bool,
     region: Option<&str>,
+    all_frames: bool,
 ) -> anyhow::Result<ExitCode> {
     let base_frames = frames_for(base_path)?;
     let candidate_frames = frames_for(candidate_path)?;
@@ -131,11 +149,32 @@ fn run_compare(
     // it was before this crate learned about sequences.
     if verdicts.len() == 1 {
         print!("{}", verdicts[0]);
-    } else {
+    } else if all_frames {
         for (index, verdict) in verdicts.iter().enumerate() {
             println!("frame {index}");
             print!("{verdict}");
         }
+    } else {
+        // Print the frames that changed, then say how many did not. A
+        // reader looking for a change reads only lines that carry one,
+        // and a run of adjacent changed frames reads as a run because
+        // nothing sits between its members any more.
+        let mut unchanged = 0usize;
+        for (index, verdict) in verdicts.iter().enumerate() {
+            if matches!(verdict, chrys_core::Verdict::Identical) {
+                unchanged += 1;
+                continue;
+            }
+            println!("frame {index}");
+            print!("{verdict}");
+        }
+        // The tail states the whole count, not only the silent part, so a
+        // reader never has to add two numbers to learn how much was
+        // compared. It prints even when nothing changed, because "0 of
+        // 100 frames changed" and an empty stdout are different answers
+        // and only one of them is legible.
+        let changed = verdicts.len() - unchanged;
+        println!("{changed} of {} frames changed", verdicts.len());
     }
 
     let worst = verdicts.iter().map(verdict_rank).max().unwrap_or(0);
