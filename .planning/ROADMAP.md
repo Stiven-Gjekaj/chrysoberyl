@@ -127,7 +127,7 @@ cross-architecture evidence that can be measured on one machine today.
   3. The animation adapter is added with no change to any file in the comparison engine.
   4. An input source supplies a named region as a hint, and the engine registers inside that region instead of searching for it.
 
-**Plans**: 4/5 plans executed
+**Plans**: 5/5 plans executed
 
 Plans:
 **Wave 1**
@@ -148,7 +148,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 02-05-PLAN.md — A named region supplied by the source, compared inside, with the engine unchanged
+- [x] 02-05-PLAN.md — A named region supplied by the source, compared inside, with the engine unchanged
 
 **Note**: the waves are ordered by one constraint. Wave 1 and Wave 2 may
 change `crates/chrys-core/`, because that is where the generic pairing lands.
@@ -255,7 +255,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Raster engine and determinism proof | 8/8 | In Progress|  |
-| 2. Source trait and a second format | 4/5 | In Progress|  |
+| 2. Source trait and a second format | 5/5 | In Progress|  |
 | 3. Baseline, rules and CI gate | 0/TBD | Not started | - |
 | 4. SVG rasterization | 0/TBD | Not started | - |
 | 5. PDF page comparison | 0/TBD | Not started | - |
