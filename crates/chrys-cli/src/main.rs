@@ -69,17 +69,42 @@ fn run_compare(
     let verdicts = chrys_core::compare_sequence(&base_frames, &candidate_frames)?;
 
     if hash_only {
-        let base_frame = base_frames
-            .first()
-            .ok_or_else(|| anyhow::anyhow!("{} decoded to zero frames", base_path.display()))?;
-        let candidate_frame = candidate_frames.first().ok_or_else(|| {
-            anyhow::anyhow!("{} decoded to zero frames", candidate_path.display())
-        })?;
-        let verdict = verdicts
-            .first()
-            .ok_or_else(|| anyhow::anyhow!("compare_sequence returned no verdict"))?;
-        let digests = chrys_core::hash::digest_report(base_frame, candidate_frame, verdict)?;
-        print!("{digests}");
+        // A one-against-one sequence prints exactly the four digest lines
+        // phase 1's `compare --hash-only` printed, byte-identical to
+        // before this crate learned about sequences. A longer sequence
+        // prints one four-line block per index, with a `frame {index}`
+        // header before each block so the report stays parseable per
+        // frame. `verdicts.len() == 1` is the same rule the verdict-text
+        // branch below already uses to draw this line.
+        if verdicts.len() == 1 {
+            let base_frame = base_frames
+                .first()
+                .ok_or_else(|| anyhow::anyhow!("{} decoded to zero frames", base_path.display()))?;
+            let candidate_frame = candidate_frames.first().ok_or_else(|| {
+                anyhow::anyhow!("{} decoded to zero frames", candidate_path.display())
+            })?;
+            let digests =
+                chrys_core::hash::digest_report(base_frame, candidate_frame, &verdicts[0])?;
+            print!("{digests}");
+            return Ok(ExitCode::from(0));
+        }
+
+        for (position, verdict) in verdicts.iter().enumerate() {
+            let base_frame = base_frames.get(position).ok_or_else(|| {
+                anyhow::anyhow!("{} has no frame at index {position}", base_path.display())
+            })?;
+            let candidate_frame = candidate_frames.get(position).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "{} has no frame at index {position}",
+                    candidate_path.display()
+                )
+            })?;
+            // The printed index is the frame's own `index` field, the same
+            // number the engine paired on, not the loop position.
+            println!("frame {}", base_frame.index);
+            let digests = chrys_core::hash::digest_report(base_frame, candidate_frame, verdict)?;
+            print!("{digests}");
+        }
         return Ok(ExitCode::from(0));
     }
 

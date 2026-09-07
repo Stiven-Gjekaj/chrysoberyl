@@ -22,6 +22,21 @@ fn run_hash_only() -> String {
     String::from_utf8(output.stdout).expect("stdout is UTF-8")
 }
 
+/// Run `--hash-only` over the committed 11-frame `tests/golden/sequence-01`
+/// pair, the fixture plan 02-01 committed.
+fn run_hash_only_sequence() -> String {
+    let root = repo_root();
+    let output = Command::new(env!("CARGO_BIN_EXE_chrys"))
+        .arg("compare")
+        .arg(root.join("tests/golden/sequence-01/base"))
+        .arg(root.join("tests/golden/sequence-01/candidate"))
+        .arg("--hash-only")
+        .output()
+        .expect("the chrys binary runs");
+    assert!(output.status.success(), "chrys --hash-only did not exit 0");
+    String::from_utf8(output.stdout).expect("stdout is UTF-8")
+}
+
 #[test]
 fn the_two_decode_lines_match_the_committed_digest_file() {
     let live = run_hash_only();
@@ -116,4 +131,60 @@ fn the_four_digests_match_the_committed_digest_file() {
         live_lines.join("\n"),
         committed_lines.join("\n")
     );
+}
+
+#[test]
+fn a_sequence_reports_one_digest_block_per_frame_index() {
+    let live = run_hash_only_sequence();
+    let lines: Vec<&str> = live.lines().collect();
+    assert_eq!(
+        lines.len(),
+        55,
+        "expected 11 header lines and 44 digest lines (55 total), got {}:\n{live}",
+        lines.len()
+    );
+
+    let mut header_indices: Vec<u32> = Vec::new();
+    for chunk in lines.chunks(5) {
+        assert_eq!(
+            chunk.len(),
+            5,
+            "a frame block holds a header and four digest lines"
+        );
+        let header = chunk[0];
+        let index_text = header
+            .strip_prefix("frame ")
+            .unwrap_or_else(|| panic!("header line does not start with 'frame ': {header}"));
+        let index: u32 = index_text
+            .parse()
+            .unwrap_or_else(|error| panic!("header index is not a number ({error}): {header}"));
+        header_indices.push(index);
+
+        for digest_line in &chunk[1..] {
+            let digest = digest_line
+                .split(' ')
+                .nth(1)
+                .unwrap_or_else(|| panic!("line has no digest field: {digest_line}"));
+            assert_eq!(digest.len(), 64, "digest is not 64 characters: {digest}");
+            assert!(
+                digest
+                    .chars()
+                    .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
+                "digest is not lowercase hexadecimal: {digest}"
+            );
+        }
+    }
+
+    let expected_indices: Vec<u32> = (0..11).collect();
+    assert_eq!(
+        header_indices, expected_indices,
+        "the header indices must run 0 through 10 in order"
+    );
+}
+
+#[test]
+fn a_second_run_over_the_sequence_gives_byte_identical_stdout() {
+    let first = run_hash_only_sequence();
+    let second = run_hash_only_sequence();
+    assert_eq!(first, second);
 }
