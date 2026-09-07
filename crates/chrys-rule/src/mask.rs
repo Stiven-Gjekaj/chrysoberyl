@@ -135,7 +135,16 @@ pub fn load_mask(
 
 /// Resolve `mask_path` (a `Scope::Mask` rule's own, as-written path)
 /// against `rule_dir` (the rule file's own directory), refusing a path
-/// that leaves `rule_dir`, and return the resolved path otherwise.
+/// that leaves `rule_dir`, and return the CANONICAL path this function
+/// verified, not the merely joined one.
+///
+/// Returning the verified path is what this function's own name promises:
+/// the caller opens the path this function returns, so the resolution the
+/// operating system performs when that path is opened is the same
+/// resolution the check above already covered. Returning `joined`
+/// instead, the un-canonicalized form, would let the caller's own open
+/// resolve the path a second time, through a symbolic link this function
+/// already checked against but the caller's own resolution runs fresh.
 ///
 /// A rule file is structured input read as data, and after this plan it
 /// holds a file path: the one field in this schema that reaches outside
@@ -189,7 +198,7 @@ pub(crate) fn resolve_mask_path(rule_dir: &Path, mask_path: &Path) -> Result<Pat
         });
     }
 
-    Ok(joined)
+    Ok(canonical_mask)
 }
 
 #[cfg(test)]
@@ -263,6 +272,39 @@ mod tests {
             height: 4,
         };
         assert!(!mask.tolerates(&bbox));
+    }
+
+    /// RULE-02, WR-01: the path `resolve_mask_path` returns is the exact
+    /// canonical path it already verified, not the merely joined path a
+    /// caller would then have to resolve a second time.
+    #[test]
+    fn resolve_mask_path_returns_the_path_it_verified() {
+        let rule_dir = std::env::temp_dir().join(format!(
+            "chrys-rule-mask-test-resolve-returns-verified-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&rule_dir).expect("create a fresh rule directory");
+        let mask_path = PathBuf::from("m.png");
+        let joined = rule_dir.join(&mask_path);
+        RgbaImage::from_pixel(2, 2, Rgba([255, 255, 255, 255]))
+            .save(&joined)
+            .expect("write the mask file");
+
+        let expected = joined
+            .canonicalize()
+            .expect("the joined path canonicalizes");
+        let returned =
+            resolve_mask_path(&rule_dir, &mask_path).expect("a mask inside rule_dir resolves");
+
+        assert_eq!(
+            returned,
+            expected,
+            "resolve_mask_path returned {}, but the path it verified was {}",
+            returned.display(),
+            expected.display()
+        );
+
+        std::fs::remove_dir_all(&rule_dir).ok();
     }
 
     #[test]
