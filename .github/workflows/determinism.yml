@@ -88,6 +88,9 @@ jobs:
           echo "== tests/golden/formats/webp-anim ==" >> digest.txt
           cargo run -q --release -p chrys-cli -- compare tests/golden/formats/webp-anim/base.webp tests/golden/formats/webp-anim/candidate.webp --hash-only >> digest.txt
 
+          echo "== tests/golden/alpha-01 ==" >> digest.txt
+          cargo run -q --release -p chrys-cli -- compare tests/golden/alpha-01/base.png tests/golden/alpha-01/candidate.png --hash-only >> digest.txt
+
       - name: Upload the digest report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
