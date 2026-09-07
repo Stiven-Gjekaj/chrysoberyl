@@ -90,3 +90,56 @@ fn frame_zero_of_the_gif_and_apng_fixtures_hold_the_same_pixels() {
          from the same source frame, and both formats are lossless here"
     );
 }
+
+#[test]
+fn webp_anim() {
+    let path = golden_root()
+        .join("formats")
+        .join("webp-anim")
+        .join("base.webp");
+    let source = AnimationSource::new();
+    let frames = source
+        .load(&path)
+        .expect("load and re-verify the committed webp-anim fixture");
+
+    assert_five_composited_frames(&frames);
+}
+
+#[test]
+fn is_animation_is_true_for_the_animated_webp_fixture_and_false_for_a_still_webp() {
+    let animated_path = golden_root()
+        .join("formats")
+        .join("webp-anim")
+        .join("base.webp");
+    let still_path = golden_root().join("formats").join("webp").join("base.webp");
+
+    assert!(
+        chrys_source_animation::sniff::is_animation(&animated_path)
+            .expect("sniff the committed animated webp fixture")
+    );
+    assert!(
+        !chrys_source_animation::sniff::is_animation(&still_path)
+            .expect("sniff the committed still webp fixture")
+    );
+}
+
+#[test]
+fn frame_zero_of_the_gif_and_animated_webp_fixtures_hold_the_same_pixels() {
+    let gif_path = golden_root().join("formats").join("gif").join("base.gif");
+    let webp_path = golden_root()
+        .join("formats")
+        .join("webp-anim")
+        .join("base.webp");
+    let source = AnimationSource::new();
+
+    let gif_frames = source.load(&gif_path).expect("load the gif fixture");
+    let webp_frames = source.load(&webp_path).expect("load the webp-anim fixture");
+
+    assert_eq!(gif_frames[0].width, webp_frames[0].width);
+    assert_eq!(gif_frames[0].height, webp_frames[0].height);
+    assert_eq!(
+        gif_frames[0].pixels, webp_frames[0].pixels,
+        "frame 0 of the gif and animated webp fixtures should hold identical pixels: both \
+         were built from the same source frame, and both formats are lossless here"
+    );
+}
