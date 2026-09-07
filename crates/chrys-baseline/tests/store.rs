@@ -438,6 +438,23 @@ fn function_body_span(stripped: &str, name: &str) -> (usize, usize) {
     }
 }
 
+/// Return the name of the function whose `fn` keyword most closely
+/// precedes byte offset `at` in `stripped` (already run through
+/// `strip_comments_and_strings`), so a failure can name the function an
+/// offending call was found inside, not only its byte offset.
+fn enclosing_function_name(stripped: &str, at: usize) -> String {
+    let before = &stripped[..at];
+    let fn_at = before.rfind("fn ").unwrap_or_else(|| {
+        panic!("no `fn` keyword precedes offset {at}; the offending call is outside any function")
+    });
+    let after_fn = &stripped[fn_at + "fn ".len()..];
+    after_fn
+        .split(|c: char| c == '(' || c.is_whitespace())
+        .next()
+        .unwrap_or("")
+        .to_string()
+}
+
 #[test]
 fn only_the_accept_path_writes_to_the_store() {
     let src_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
@@ -459,7 +476,7 @@ fn only_the_accept_path_writes_to_the_store() {
     let golden_stripped = strip_comments_and_strings(&golden_source);
     let (write_body_start, write_body_end) = function_body_span(&golden_stripped, "write_baseline");
 
-    let mut offenders: Vec<(PathBuf, &str, usize)> = Vec::new();
+    let mut offenders: Vec<(PathBuf, &str, usize, String)> = Vec::new();
     for file in &files {
         let source = fs::read_to_string(file)
             .unwrap_or_else(|error| panic!("cannot read {}: {error}", file.display()));
@@ -471,7 +488,8 @@ fn only_the_accept_path_writes_to_the_store() {
                 let inside_write_baseline =
                     *file == golden_path && at >= write_body_start && at < write_body_end;
                 if !inside_write_baseline {
-                    offenders.push((file.clone(), call, at));
+                    let enclosing_fn = enclosing_function_name(&stripped, at);
+                    offenders.push((file.clone(), call, at, enclosing_fn));
                 }
                 search_from = at + call.len();
             }
@@ -484,7 +502,10 @@ fn only_the_accept_path_writes_to_the_store() {
          in this crate must go through: {}",
         offenders
             .iter()
-            .map(|(file, call, at)| format!("{}@{at}: `{call}`", file.display()))
+            .map(|(file, call, at, enclosing_fn)| format!(
+                "{}@{at}, inside fn {enclosing_fn}: `{call}`",
+                file.display()
+            ))
             .collect::<Vec<_>>()
             .join(", ")
     );
