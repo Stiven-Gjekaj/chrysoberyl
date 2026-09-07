@@ -9,10 +9,10 @@ use chrys_source::Frame;
 ///
 /// The buffer has the same length as the two input frames. This runs the
 /// full registration pipeline (`phase_correlate`, then `block_match`) and
-/// renders the `ResidualField` it produces: each of the red, green and
-/// blue bytes is the absolute difference of the corresponding bytes once
-/// the pair is aligned, both globally and at the block that pixel falls
-/// in, and the alpha byte is always 255.
+/// renders the `ResidualField` it produces: each of the four bytes,
+/// including alpha, is the absolute difference of the corresponding bytes
+/// once the pair is aligned, both globally and at the block that pixel
+/// falls in.
 ///
 /// Returns `CompareError::ShapeMismatch` when the frames differ in size.
 pub fn residual_rgba8(base: &Frame, candidate: &Frame) -> Result<Vec<u8>, CompareError> {
@@ -47,7 +47,7 @@ mod tests {
     }
 
     #[test]
-    fn identical_frames_return_a_residual_of_all_zero_colour_channels() {
+    fn identical_frames_return_a_residual_of_all_zero_bytes() {
         let a = solid_frame(2, 2, [10, 20, 30, 255]);
         let b = solid_frame(2, 2, [10, 20, 30, 255]);
         let residual = residual_rgba8(&a, &b).unwrap();
@@ -56,15 +56,20 @@ mod tests {
             assert_eq!(chunk[0], 0);
             assert_eq!(chunk[1], 0);
             assert_eq!(chunk[2], 0);
-            assert_eq!(chunk[3], 255);
+            assert_eq!(chunk[3], 0);
         }
     }
 
     #[test]
-    fn differing_frames_return_the_absolute_channel_difference() {
+    fn differing_frames_return_the_absolute_channel_difference_including_alpha() {
         let a = solid_frame(1, 1, [10, 20, 30, 255]);
         let b = solid_frame(1, 1, [30, 10, 30, 0]);
         let residual = residual_rgba8(&a, &b).unwrap();
+        // The fourth byte, 255, is a coincidence worth naming: it is
+        // base alpha 255 differenced against candidate alpha 0, a real
+        // measured alpha difference, not the old constant `u8::MAX` sentinel
+        // this buffer used to carry. This test would pass for the wrong
+        // reason if that constant ever came back.
         assert_eq!(residual, vec![20, 10, 0, 255]);
     }
 

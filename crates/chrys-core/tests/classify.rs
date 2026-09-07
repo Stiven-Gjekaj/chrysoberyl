@@ -18,10 +18,7 @@ use chrys_core::{BoundingBox, ChangeKind, Region};
 use chrys_source::Frame;
 
 fn empty_residual(width: usize, height: usize) -> ResidualField {
-    let mut samples = vec![0u8; width * height * 4];
-    for chunk in samples.chunks_exact_mut(4) {
-        chunk[3] = u8::MAX;
-    }
+    let samples = vec![0u8; width * height * 4];
     ResidualField {
         width,
         height,
@@ -229,7 +226,7 @@ fn residual_from_raw_diff(base: &Frame, candidate: &Frame) -> ResidualField {
         chunk[0] = base_pixels[byte_idx].abs_diff(candidate_pixels[byte_idx]);
         chunk[1] = base_pixels[byte_idx + 1].abs_diff(candidate_pixels[byte_idx + 1]);
         chunk[2] = base_pixels[byte_idx + 2].abs_diff(candidate_pixels[byte_idx + 2]);
-        chunk[3] = u8::MAX;
+        chunk[3] = base_pixels[byte_idx + 3].abs_diff(candidate_pixels[byte_idx + 3]);
     }
     ResidualField {
         width,

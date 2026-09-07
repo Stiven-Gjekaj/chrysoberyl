@@ -18,6 +18,17 @@
 //! block through `window_sum`. Nothing here loops pixel by pixel inside a
 //! block for a candidate; that is the anti-pattern summed-area tables
 //! exist to remove.
+//!
+//! **Search versus detection.** This module's search is a registration
+//! step: it answers where content moved to, and it answers that question
+//! from luma alone, because luma is what the search's own pyramid is
+//! built from. Alpha does not help locate content, so the search stays as
+//! it is, scored on the red, green and blue channels only. Whether a
+//! pixel changed at all is a different question, answered downstream in
+//! `crate::classify`, and that question does read alpha. A later reader
+//! must not "complete" this search by adding alpha to it; see
+//! `BlockOffset::score`'s own doc comment for the same separation stated
+//! at the field it applies to.
 
 use std::collections::HashMap;
 
@@ -87,7 +98,12 @@ pub struct BlockOffset {
     /// The block's own vertical offset, in pixels, on top of the global
     /// offset already removed.
     pub dy: i32,
-    /// The sum of absolute RGB differences over the block at `(dx, dy)`.
+    /// The sum of absolute red, green and blue differences over the block
+    /// at `(dx, dy)`. This reports the quantity the luma search actually
+    /// minimised: the search is a registration step that answers where
+    /// content moved, not whether a pixel changed, so it is scored on the
+    /// same three channels the luma pyramid is built from, and alpha never
+    /// enters it.
     pub score: u64,
 }
 
@@ -101,8 +117,9 @@ pub struct ResidualField {
     /// The field's height, in pixels. Equal to the compared frames'
     /// height.
     pub height: usize,
-    /// The residual RGBA8 buffer, row major, no row padding, alpha always
-    /// `u8::MAX`.
+    /// The residual RGBA8 buffer, row major, no row padding: the
+    /// per-channel absolute difference of the aligned pair, over all four
+    /// channels, at each block's own winning offset.
     pub samples: Vec<u8>,
     /// Every block's own offset, in row-major block order.
     pub blocks: Vec<BlockOffset>,
@@ -224,10 +241,9 @@ pub fn block_match(
     // distinct absolute offset, since many blocks typically share the
     // same winner (most of all, (0, 0)).
     let mut full_diff_cache: HashMap<(i32, i32), Vec<u8>> = HashMap::new();
+    // Every sample below is overwritten by its own block's winning
+    // difference; nothing here is read before it is written.
     let mut samples = vec![FILL_VALUE; base.rgba8().len()];
-    for chunk in samples.chunks_exact_mut(4) {
-        chunk[3] = u8::MAX;
-    }
 
     let mut blocks = Vec::with_capacity(blocks_x * blocks_y);
     #[allow(clippy::needless_range_loop)]

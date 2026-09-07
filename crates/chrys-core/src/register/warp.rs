@@ -55,8 +55,12 @@ pub fn warp_by_offset(frame: &Frame, dx: i32, dy: i32) -> Vec<u8> {
 }
 
 /// Return the per-byte absolute difference of two RGBA8 buffers of equal
-/// length, with the alpha byte of each output pixel set to `u8::MAX` so the
-/// result is a viewable image.
+/// length, over all four channels the `Frame` contract carries.
+///
+/// `u8::abs_diff` is exact integer arithmetic on every platform, so this
+/// buffer is a measurement, not a picture: unlike an image meant for
+/// viewing, its fourth byte is not a usable alpha channel, it is the
+/// alpha difference.
 ///
 /// `base` and `warped` must have the same length; a debug build asserts
 /// this, because the only two call sites in this crate always hand it a
@@ -74,10 +78,9 @@ pub fn difference_image(base: &[u8], warped: &[u8]) -> Vec<u8> {
     );
     let mut out = Vec::with_capacity(base.len());
     for chunk_start in (0..base.len()).step_by(4) {
-        for channel in 0..3 {
+        for channel in 0..4 {
             out.push(base[chunk_start + channel].abs_diff(warped[chunk_start + channel]));
         }
-        out.push(u8::MAX);
     }
     out
 }
@@ -162,14 +165,14 @@ mod tests {
     }
 
     #[test]
-    fn difference_image_of_a_pair_with_itself_is_all_zero_colour_channels() {
+    fn difference_image_of_a_pair_with_itself_is_all_zero_on_every_channel() {
         let frame = ramp_frame(5, 5);
         let diff = difference_image(&frame.pixels, &frame.pixels);
         for chunk in diff.chunks_exact(4) {
             assert_eq!(chunk[0], 0);
             assert_eq!(chunk[1], 0);
             assert_eq!(chunk[2], 0);
-            assert_eq!(chunk[3], u8::MAX);
+            assert_eq!(chunk[3], 0);
         }
     }
 

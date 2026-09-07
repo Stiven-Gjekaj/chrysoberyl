@@ -148,8 +148,10 @@ fn labelled_neighbour(
 /// Group `residual`'s changed pixels into labelled regions with bounding
 /// boxes.
 ///
-/// A pixel is a change when the largest of its three residual colour
-/// channels exceeds `RESIDUAL_THRESHOLD`. Two regions touching only at a
+/// A pixel is a change when the largest of its four residual bytes exceeds
+/// `RESIDUAL_THRESHOLD`. Alpha is part of what "changed" means (see
+/// PROJECT.md's Key Decisions), so the fourth byte is read on the same
+/// footing as the other three, not dropped. Two regions touching only at a
 /// corner are one region, because connectivity is eight-way.
 ///
 /// The returned list is sorted by bounding box top edge, then left edge,
@@ -167,7 +169,8 @@ pub fn label_regions(residual: &ResidualField) -> Vec<LabelledRegion> {
             let r = residual.samples[idx];
             let g = residual.samples[idx + 1];
             let b = residual.samples[idx + 2];
-            let magnitude = r.max(g).max(b);
+            let a = residual.samples[idx + 3];
+            let magnitude = r.max(g).max(b).max(a);
             is_foreground[y * width + x] = magnitude > RESIDUAL_THRESHOLD;
         }
     }

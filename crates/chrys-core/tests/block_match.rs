@@ -107,7 +107,7 @@ fn difference_image_on_two_identical_buffers_returns_all_zeros() {
         assert_eq!(chunk[0], 0);
         assert_eq!(chunk[1], 0);
         assert_eq!(chunk[2], 0);
-        assert_eq!(chunk[3], 255);
+        assert_eq!(chunk[3], 0);
     }
 }
 
@@ -197,6 +197,14 @@ fn textured_frame(width: u32, height: u32, seed: u32) -> Frame {
     frame_from(width, height, pixels)
 }
 
+/// Deliberately reads the first three bytes only, never the fourth: the two
+/// tests that call this helper recolour a region on its colour bytes alone,
+/// against frames that are fully opaque everywhere, so an alpha byte can
+/// never be the reason a pixel here counts as changed. Widening this to four
+/// bytes would test nothing more on this file's own fixtures; the fourth
+/// byte's own behaviour is covered directly by
+/// `block_match_on_an_identical_pair_reports_zero_offset_and_an_all_zero_residual`
+/// above.
 fn count_nonzero_colour_pixels(field_samples: &[u8], width: usize) -> Vec<(usize, usize)> {
     let mut positions = Vec::new();
     for (index, chunk) in field_samples.chunks_exact(4).enumerate() {
@@ -218,7 +226,7 @@ fn block_match_on_an_identical_pair_reports_zero_offset_and_an_all_zero_residual
         assert_eq!(chunk[0], 0);
         assert_eq!(chunk[1], 0);
         assert_eq!(chunk[2], 0);
-        assert_eq!(chunk[3], 255);
+        assert_eq!(chunk[3], 0);
     }
 }
 
