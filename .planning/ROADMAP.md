@@ -170,7 +170,30 @@ range after proving the measurement can fail.
   5. A person accepts a new baseline explicitly through the CLI. Nothing updates a baseline on its own, and every decode call sets an explicit memory limit.
   6. The report names the file a frame came from, not only its index. Phase 2 printed a zero-based index beside files named from one, and no fixed offset fixes that, because the producer names the files.
 
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+**Wave 1**
+
+- [x] 03-01-PLAN.md — A rule file scopes a tolerance by kind and by named region, and the exit code follows it
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 03-02-PLAN.md — A rule scoped to a mask of white opaque pixels, and the shipped example
+- [ ] 03-03-PLAN.md — The report names the file a frame came from, and every decode call site is guarded
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 03-04-PLAN.md — A person accepts a baseline, and nothing else does
+
+**Note**: plans 03-02 and 03-03 share the same wave because they touch no
+file in common. Plan 03-02 owns `crates/chrys-rule/` and the fixtures; plan
+03-03 owns `crates/chrys-source/`, `crates/chrys-source-sequence/` and
+`crates/chrys-cli/`. Every plan checks that `crates/chrys-core`'s tree
+object id is still `c97a6fb778c4b1373e5c4dc563481cc18e4c98c0`, which is the
+phase's headline claim, and plan 03-04 runs
+`scripts/engine-boundary-drill.sh` over the whole phase's commit range as
+the phase gate.
 
 ### Phase 4: SVG rasterization
 
@@ -257,7 +280,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 |-------|----------------|--------|-----------|
 | 1. Raster engine and determinism proof | 9/9 | Complete    | 2026-09-07 |
 | 2. Source trait and a second format | 5/5 | Complete    | 2026-09-07 |
-| 3. Baseline, rules and CI gate | 0/TBD | Not started | - |
+| 3. Baseline, rules and CI gate | 0/4 | Planned     | - |
 | 4. SVG rasterization | 0/TBD | Not started | - |
 | 5. PDF page comparison | 0/TBD | Not started | - |
 | 6. wgpu mirror and native window | 0/TBD | Not started | - |
