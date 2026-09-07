@@ -115,6 +115,42 @@ same threat.
 
 ---
 
+## The unsafe path this audit missed
+
+The phase verifier found a false pass that this audit did not, and the
+orchestrator reproduced it independently on a fresh build.
+
+A rule file whose mask is sized to the CROPPED region, rather than to the
+frame, defeats the size check under `--region`:
+
+    chrys compare base.png candidate.png --rule r70.toml
+    mask masks/m70.png is 70x60, which does not match the 256x256 frame
+    exit 3
+
+    chrys compare base.png candidate.png --rule r70.toml --region badge
+    Recoloured region at x=10, y=10, width=50, height=40, colour delta 115.65
+    exit 0
+
+The second run prints a real change and reports success. A CI job that gates
+on the exit code goes green.
+
+This audit tested the mask size check with a frame-sized mask, which the check
+catches. It did not test a mask sized to the crop, which the check cannot
+catch, because after the crop the two sizes agree and the mask is then applied
+to a coordinate space it was never authored for. T-03-11's control is sound;
+the composition of `--region` with a mask-scoped rule is not.
+
+The audit's own error is worth naming. Both times this file got a mask
+question wrong, the cause was the same: it tested the case its author
+imagined, rather than the case an adversary would build. Once that produced a
+false alarm against working code, and once it missed a real hole. The second
+is the expensive direction.
+
+Tracked as CR-01 in `03-REVIEW.md` and as a blocking gap in
+`03-VERIFICATION.md`. It is not fixed here.
+
+---
+
 ## A gap this audit found, and closed
 
 **One crate shipped without `#![forbid(unsafe_code)]`.**
