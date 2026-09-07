@@ -115,6 +115,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrys-core",
+ "chrys-rule",
  "chrys-source",
  "chrys-source-animation",
  "chrys-source-raster",
@@ -133,6 +134,17 @@ dependencies = [
  "rustfft",
  "sha2",
  "thiserror",
+]
+
+[[package]]
+name = "chrys-rule"
+version = "0.1.0"
+dependencies = [
+ "chrys-core",
+ "chrys-source",
+ "serde",
+ "thiserror",
+ "toml",
 ]
 
 [[package]]

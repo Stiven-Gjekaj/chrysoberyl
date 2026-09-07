@@ -70,6 +70,7 @@ fn main() {
     write_sequence_01();
     write_hint_01();
     write_alpha_01();
+    write_rule_01();
 }
 
 /// Write the first committed pair, read by plan 01-03. Its bytes must not
@@ -521,6 +522,56 @@ fn write_alpha_01() {
 
     println!("wrote {}", base_path.display());
     println!("wrote {}", candidate_path.display());
+}
+
+/// The rectangle a `badge` region hint names in the `rule-01` fixture: a
+/// margin of ten pixels on every side of `STRUCTURED_RECTS[0]`'s own
+/// rectangle (`(40, 40, 50, 40)`), so the region the engine detects there
+/// falls inside the named one by well over half its area.
+const RULE_01_REGION: (u32, u32, u32, u32) = (30, 30, 70, 60);
+
+/// Write the committed `rule-01` fixture, read by
+/// `crates/chrys-cli/tests/rule_gate.rs`.
+///
+/// The base is `build_structured_canvas(0, 0)`, the same near-identical
+/// content the `should-register` corpus already measures a peak
+/// confidence for, well above the refusal threshold. The candidate
+/// recolours `STRUCTURED_RECTS[0]`, the same construction
+/// `should_register_pairs`'s own `recoloured_small` pair already uses. A
+/// hints sidecar on both sides names one region, `badge`, whose rectangle
+/// contains that recoloured rectangle with a margin on every side.
+fn write_rule_01() {
+    let base = build_structured_canvas(0, 0);
+    let mut candidate = base.clone();
+    recolour_first_rect(&mut candidate, Rgba([40, 200, 200, 255]));
+
+    let out_dir = golden_root().join("rule-01");
+    std::fs::create_dir_all(&out_dir)
+        .unwrap_or_else(|e| panic!("create {}: {e}", out_dir.display()));
+
+    let base_path = out_dir.join("base.png");
+    let candidate_path = out_dir.join("candidate.png");
+    base.save(&base_path)
+        .unwrap_or_else(|e| panic!("write {}: {e}", base_path.display()));
+    candidate
+        .save(&candidate_path)
+        .unwrap_or_else(|e| panic!("write {}: {e}", candidate_path.display()));
+
+    let (x, y, width, height) = RULE_01_REGION;
+    let sidecar = format!(
+        "[[hint]]\nname = \"badge\"\nx = {x}\ny = {y}\nwidth = {width}\nheight = {height}\n"
+    );
+    let base_sidecar_path = out_dir.join("base.hints.toml");
+    let candidate_sidecar_path = out_dir.join("candidate.hints.toml");
+    std::fs::write(&base_sidecar_path, &sidecar)
+        .unwrap_or_else(|e| panic!("write {}: {e}", base_sidecar_path.display()));
+    std::fs::write(&candidate_sidecar_path, &sidecar)
+        .unwrap_or_else(|e| panic!("write {}: {e}", candidate_sidecar_path.display()));
+
+    println!("wrote {}", base_path.display());
+    println!("wrote {}", candidate_path.display());
+    println!("wrote {}", base_sidecar_path.display());
+    println!("wrote {}", candidate_sidecar_path.display());
 }
 
 fn golden_root() -> std::path::PathBuf {

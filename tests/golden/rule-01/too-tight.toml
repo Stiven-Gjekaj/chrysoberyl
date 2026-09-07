@@ -1,0 +1,8 @@
+# The same measured colour delta (115.65) with a limit just below it, so
+# this file proves the gate actually reads the number rather than passing
+# regardless of what the rule file says.
+
+[[rule]]
+kind = "recoloured"
+region = "badge"
+max_delta_e = 115.0

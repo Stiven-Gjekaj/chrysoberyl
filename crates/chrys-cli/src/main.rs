@@ -57,6 +57,14 @@ enum Command {
         /// it must not depend on which frames happened to change.
         #[arg(long)]
         all_frames: bool,
+
+        /// Gate the exit code on a TOML rule file. Every `Changed` verdict
+        /// whose regions are all tolerated by a matching rule then exits
+        /// 0; a verdict with at least one untolerated region still exits
+        /// 1, exactly as it did before this flag existed. When this flag
+        /// is absent nothing changes at all.
+        #[arg(long)]
+        rule: Option<PathBuf>,
     },
 }
 
@@ -80,7 +88,15 @@ fn run() -> anyhow::Result<ExitCode> {
             hash_only,
             region,
             all_frames,
-        } => run_compare(&base, &candidate, hash_only, region.as_deref(), all_frames),
+            rule,
+        } => run_compare(
+            &base,
+            &candidate,
+            hash_only,
+            region.as_deref(),
+            all_frames,
+            rule.as_deref(),
+        ),
     }
 }
 
@@ -90,7 +106,12 @@ fn run_compare(
     hash_only: bool,
     region: Option<&str>,
     all_frames: bool,
+    rule_path: Option<&Path>,
 ) -> anyhow::Result<ExitCode> {
+    // Loaded before either side is decoded, so a bad rule file fails
+    // before any image decode work happens at all.
+    let rules = rule_path.map(chrys_rule::load_rules).transpose()?;
+
     let base_frames = frames_for(base_path)?;
     let candidate_frames = frames_for(candidate_path)?;
 
@@ -177,17 +198,52 @@ fn run_compare(
         println!("{changed} of {} frames changed", verdicts.len());
     }
 
-    let worst = verdicts.iter().map(verdict_rank).max().unwrap_or(0);
+    // A rule outcome is computed per frame, against that frame's own
+    // base-side hints, only when --rule was given. When it is absent this
+    // stays entirely unevaluated and the exit code below reads exactly as
+    // it did before this flag existed (CLI-03's regression guard).
+    let outcomes: Option<Vec<chrys_rule::RuleOutcome>> = rules.as_ref().map(|rules| {
+        verdicts
+            .iter()
+            .enumerate()
+            .map(|(index, verdict)| {
+                let hints = base_frames
+                    .get(index)
+                    .map(|frame| frame.hints.as_slice())
+                    .unwrap_or(&[]);
+                chrys_rule::evaluate(verdict, hints, rules)
+            })
+            .collect()
+    });
+
+    let worst = verdicts
+        .iter()
+        .enumerate()
+        .map(|(index, verdict)| {
+            let outcome = outcomes.as_ref().map(|outcomes| &outcomes[index]);
+            verdict_rank(verdict, outcome)
+        })
+        .max()
+        .unwrap_or(0);
     Ok(ExitCode::from(worst))
 }
 
 /// Rank a verdict for the process exit code: refused above changed above
 /// identical. A caller branching on the exit code of a sequence pair keeps
 /// the same three meanings a single-pair comparison already reports.
-fn verdict_rank(verdict: &chrys_core::Verdict) -> u8 {
+///
+/// `outcome` is `Some` only when `--rule` was given. A `Changed` verdict
+/// whose outcome holds no violation ranks 0 instead of 1; every other case
+/// is unchanged from before this flag existed. `Refused` always ranks 2:
+/// a rule tolerates a change, and a refusal is not a change, so no outcome
+/// can move a refusal's rank.
+fn verdict_rank(verdict: &chrys_core::Verdict, outcome: Option<&chrys_rule::RuleOutcome>) -> u8 {
     match verdict {
         chrys_core::Verdict::Identical => 0,
-        chrys_core::Verdict::Changed { .. } => 1,
+        chrys_core::Verdict::Changed { .. } => match outcome {
+            Some(outcome) if outcome.is_clean() => 0,
+            _ => 1,
+        },
         chrys_core::Verdict::Refused { .. } => 2,
     }
 }

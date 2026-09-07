@@ -18,5 +18,6 @@ chrys-source-raster = { path = "../chrys-source-raster" }
 chrys-source-sequence = { path = "../chrys-source-sequence" }
 chrys-source-animation = { path = "../chrys-source-animation" }
 chrys-core = { path = "../chrys-core" }
+chrys-rule = { path = "../chrys-rule" }
 clap.workspace = true
 anyhow.workspace = true
