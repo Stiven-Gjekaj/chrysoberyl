@@ -15,3 +15,4 @@ thiserror.workspace = true
 
 [dev-dependencies]
 chrys-source-raster = { path = "../chrys-source-raster" }
+png.workspace = true

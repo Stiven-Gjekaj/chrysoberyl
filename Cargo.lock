@@ -146,6 +146,7 @@ dependencies = [
  "chrys-source",
  "chrys-source-raster",
  "image",
+ "png",
  "thiserror",
 ]
 

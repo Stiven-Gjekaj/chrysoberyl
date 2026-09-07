@@ -86,6 +86,7 @@ pub(crate) fn build_frames() -> (Vec<RgbaImage>, Vec<RgbaImage>) {
 fn main() {
     let (base_frames, candidate_frames) = build_frames();
     write_gif_pair(&base_frames, &candidate_frames);
+    write_apng_pair(&base_frames, &candidate_frames);
 }
 
 /// Write the GIF pair with `image::codecs::gif::GifEncoder::encode_frames`,
@@ -108,6 +109,48 @@ fn write_gif(path: &std::path::Path, frames: &[RgbaImage]) {
     encoder
         .encode_frames(animation_frames)
         .unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
+
+    println!("wrote {}", path.display());
+}
+
+/// Write the APNG pair with the `png` crate directly, through
+/// `Encoder::set_animated` and `Writer::set_frame_delay`. `image`'s own
+/// high-level save path has no animated-PNG encoder, so this pair is
+/// written with `png` directly, not through `image::DynamicImage::save`.
+fn write_apng_pair(base_frames: &[RgbaImage], candidate_frames: &[RgbaImage]) {
+    let out_dir = golden_root().join("formats").join("apng");
+    std::fs::create_dir_all(&out_dir)
+        .unwrap_or_else(|e| panic!("create {}: {e}", out_dir.display()));
+
+    write_apng(&out_dir.join("base.png"), base_frames);
+    write_apng(&out_dir.join("candidate.png"), candidate_frames);
+}
+
+fn write_apng(path: &std::path::Path, frames: &[RgbaImage]) {
+    let file =
+        std::fs::File::create(path).unwrap_or_else(|e| panic!("create {}: {e}", path.display()));
+    let mut encoder = png::Encoder::new(file, WIDTH, HEIGHT);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    encoder
+        .set_animated(frames.len() as u32, 0)
+        .unwrap_or_else(|e| panic!("set_animated for {}: {e}", path.display()));
+
+    let mut writer = encoder
+        .write_header()
+        .unwrap_or_else(|e| panic!("write_header for {}: {e}", path.display()));
+
+    for frame in frames {
+        writer
+            .set_frame_delay(1, 10)
+            .unwrap_or_else(|e| panic!("set_frame_delay for {}: {e}", path.display()));
+        writer
+            .write_image_data(frame.as_raw())
+            .unwrap_or_else(|e| panic!("write_image_data for {}: {e}", path.display()));
+    }
+    writer
+        .finish()
+        .unwrap_or_else(|e| panic!("finish for {}: {e}", path.display()));
 
     println!("wrote {}", path.display());
 }
