@@ -1,18 +1,18 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 1
-current_phase_name: Raster engine and determinism proof
-status: executing
-stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated
-last_updated: "2026-09-06T22:16:25.950Z"
+current_phase: 3
+current_phase_name: Baseline, rules and CI gate
+status: ready_to_plan
+stopped_at: Phase 2 closed; learnings, UAT and estimate calibration recorded
+last_updated: "2026-09-07T09:30:00.000Z"
 last_activity: 2026-09-07
 state_head: 65c20bdc69762ebc1c24e072aca761b450f66c14
 progress:
   total_phases: 8
-  completed_phases: 0
-  total_plans: 8
-  completed_plans: 0
-  percent: 0
+  completed_phases: 2
+  total_plans: 13
+  completed_plans: 13
+  percent: 25
 ---
 
 # Project State
@@ -22,35 +22,36 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-06)
 
 **Core value:** A baseline is portable. The same pair gives the same verdict on any machine, any GPU and any driver.
-**Current focus:** Phase 1 - Raster engine and determinism proof
+**Current focus:** Phase 3 - Baseline, rules and CI gate
 
 ## Current Position
 
-Phase: 1 (Raster engine and determinism proof) — READY TO EXECUTE
+Phase: 3 (Baseline, rules and CI gate) — READY TO PLAN
 Plan: 0 of TBD in current phase
-Status: Ready to execute
+Status: Phases 1 and 2 executed. Neither has a canonical VERIFICATION.md.
 Last activity: 2026-09-07
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] 25%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0
-- Average duration: - min
-- Total execution time: 0 hours
+- Total plans completed: 13
+- Token estimate factor: 0.5 (13 samples, high confidence)
+- Actual tokens per plan: 4850 to 14869
 
 **By Phase:**
 
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| - | - | - | - |
+| Phase | Plans | Status |
+|-------|-------|--------|
+| 1 | 8 | executed, verification report missing |
+| 2 | 5 | executed, verification report missing |
 
 **Recent Trend:**
 
-- Last 5 plans: none yet
-- Trend: -
+- Last 5 plans: phase 2, waves 1 through 5
+- Trend: estimates run about twice the actual token cost
 
 *Updated after each plan completion*
 
@@ -86,6 +87,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-06
-Stopped at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated
+Last session: 2026-09-07
+Stopped at: Phase 2 closed at commit 106d333; 87 commits, 175 tests, CI green on six runners
 Resume file: None

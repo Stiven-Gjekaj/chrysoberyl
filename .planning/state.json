@@ -6,12 +6,12 @@
     {
       "number": "1",
       "name": "Raster engine and determinism proof",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "2",
       "name": "Source trait and a second format",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "3",
@@ -47,7 +47,7 @@
   "next": {
     "command": "/gsd:progress --next",
     "label": "Advance to the next step",
-    "reason": "Phase 1 of 8 · 0% · executing"
+    "reason": "Phase 1 of 8 \u00b7 0% \u00b7 executing"
   },
   "updated_at": "2026-09-06T15:40:47.200Z"
 }
