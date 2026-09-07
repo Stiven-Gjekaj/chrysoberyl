@@ -147,8 +147,8 @@ status: complete
 
 ## Task Commits
 
-1. **Task 1: Measure peak confidence across a corpus a person has judged** - `d03015f` (feat + test: `chrys-core/src/register/confidence.rs`, `chrys-core/src/register/{mod,phase_correlation}.rs`, `chrys-core/Cargo.toml`, `chrys-core/tests/refusal.rs`, `chrys-source-raster/examples/make-fixtures.rs`, `tests/golden/refuse-01/`, `Cargo.lock`)
-2. **Task 2: Refuse a pair the engine cannot register, and say why** - `61e4e6a` (feat + test: `chrys-core/src/{lib,verdict}.rs`, `chrys-core/src/register/{mod,confidence}.rs`, `chrys-core/tests/refusal.rs`, `chrys-cli/tests/refusal.rs`)
+1. **Task 1: Measure peak confidence across a corpus a person has judged** - `f26ca15` (feat + test: `chrys-core/src/register/confidence.rs`, `chrys-core/src/register/{mod,phase_correlation}.rs`, `chrys-core/Cargo.toml`, `chrys-core/tests/refusal.rs`, `chrys-source-raster/examples/make-fixtures.rs`, `tests/golden/refuse-01/`, `Cargo.lock`)
+2. **Task 2: Refuse a pair the engine cannot register, and say why** - `9c44dc6` (feat + test: `chrys-core/src/{lib,verdict}.rs`, `chrys-core/src/register/{mod,confidence}.rs`, `chrys-core/tests/refusal.rs`, `chrys-cli/tests/refusal.rs`)
 
 **Plan metadata:** commit pending (this SUMMARY — orchestrator owns STATE.md/ROADMAP.md writes per the objective given to this executor)
 
@@ -167,7 +167,7 @@ status: complete
 
 ## Decisions Made
 
-See `key-decisions` in the frontmatter. In short: `assess_peak`'s zero-floor case returns `f32::MAX` for a real peak over an exactly-zero floor rather than the plan's literal "ratio of zero," because the latter would refuse a bit-exact identical pair (`d03015f`'s corpus measurement surfaced this before any threshold existed); `chrys-source-raster` became a `chrys-core` dev-dependency so the separation test can decode real PNGs without adding a format crate to the production graph; `peak_index` was added as a small public function to close the gap between `phase_correlate`'s signed offset and `assess_peak`'s raw-index parameter; the CLI-exit-code test moved to `chrys-cli/tests/refusal.rs` because `CARGO_BIN_EXE_chrys` is scoped to the package declaring that binary and `chrys-cli` cannot be a dependency of `chrys-core` at all (no lib target); and the pre-existing recoloured-rectangle test's flat fixture was given real background structure so it exercises classification on content the new gate can register.
+See `key-decisions` in the frontmatter. In short: `assess_peak`'s zero-floor case returns `f32::MAX` for a real peak over an exactly-zero floor rather than the plan's literal "ratio of zero," because the latter would refuse a bit-exact identical pair (`f26ca15`'s corpus measurement surfaced this before any threshold existed); `chrys-source-raster` became a `chrys-core` dev-dependency so the separation test can decode real PNGs without adding a format crate to the production graph; `peak_index` was added as a small public function to close the gap between `phase_correlate`'s signed offset and `assess_peak`'s raw-index parameter; the CLI-exit-code test moved to `chrys-cli/tests/refusal.rs` because `CARGO_BIN_EXE_chrys` is scoped to the package declaring that binary and `chrys-cli` cannot be a dependency of `chrys-core` at all (no lib target); and the pre-existing recoloured-rectangle test's flat fixture was given real background structure so it exercises classification on content the new gate can register.
 
 ## Deviations from Plan
 
@@ -179,7 +179,7 @@ See `key-decisions` in the frontmatter. In short: `assess_peak`'s zero-floor cas
 - **Fix:** `assess_peak` now distinguishes "no signal at all" (`peak == 0.0 && floor == 0.0`, ratio 0) from "a real, unmeasurably sharp peak" (`peak != 0.0 && floor == 0.0`, ratio `f32::MAX`, finite and never NaN or infinite).
 - **Files modified:** `crates/chrys-core/src/register/confidence.rs`
 - **Verification:** `register::confidence::tests::a_zero_floor_with_no_peak_either_reports_a_zero_ratio`, `register::confidence::tests::a_zero_floor_with_a_real_peak_reports_the_largest_finite_ratio_not_infinity`; the separation test (`crates/chrys-core/tests/refusal.rs`) passes with the identical pair correctly scoring the maximum ratio in the corpus.
-- **Committed in:** `d03015f`
+- **Committed in:** `f26ca15`
 
 **2. [Rule 2 - Missing functionality] `peak_index` did not exist, and `compare` could not call `assess_peak` without it**
 - **Found during:** Task 1, while wiring the separation test to `phase_correlate`'s output
@@ -187,7 +187,7 @@ See `key-decisions` in the frontmatter. In short: `assess_peak`'s zero-floor cas
 - **Fix:** Added `pub fn peak_index(offset: CoarseOffset, resolution: usize) -> usize` to `phase_correlation.rs`, undoing `unwrap_bin_index` on both axes, and re-exported it from `register::mod`.
 - **Files modified:** `crates/chrys-core/src/register/phase_correlation.rs`, `crates/chrys-core/src/register/mod.rs`
 - **Verification:** `register::phase_correlation::tests::peak_index_recovers_the_raw_linear_index_a_coarse_offset_came_from`
-- **Committed in:** `d03015f`
+- **Committed in:** `f26ca15`
 
 **3. [Rule 3 - Blocking issue] `CARGO_BIN_EXE_chrys` is not defined in `chrys-core`'s own test binaries**
 - **Found during:** Task 2, writing the plan-specified CLI-exit-code test into `crates/chrys-core/tests/refusal.rs`
@@ -195,7 +195,7 @@ See `key-decisions` in the frontmatter. In short: `assess_peak`'s zero-floor cas
 - **Fix:** Moved the CLI-level test to a new `crates/chrys-cli/tests/refusal.rs`, where the package already declares the `chrys` binary. `chrys-core/tests/refusal.rs` keeps the library-level refusal behaviour (five tests) plus the separation test (one), six total, clearing the plan's own "at least six tests" gate without the infeasible test.
 - **Files modified:** `crates/chrys-cli/tests/refusal.rs` (new), `crates/chrys-core/tests/refusal.rs` (module doc comment updated to point at the new file)
 - **Verification:** `cargo test -p chrys-cli --test refusal` (2 tests, pass); `cargo test -p chrys-core --test refusal` (6 tests, pass)
-- **Committed in:** `61e4e6a`
+- **Committed in:** `9c44dc6`
 
 **4. [Rule 1 - Bug, pre-existing test broken by this plan's own change] The recoloured-rectangle unit test's flat fixture could not clear the new refusal gate**
 - **Found during:** Task 2, first `cargo test -p chrys-core --lib` run after wiring registration into `compare`
@@ -203,7 +203,7 @@ See `key-decisions` in the frontmatter. In short: `assess_peak`'s zero-floor cas
 - **Fix:** Gave the fixture four anchor rectangles (in `frame_with_anchor_rects`) that stay byte-identical between base and candidate, matching the `synthetic_frame`-with-several-rectangles pattern already used in `phase_correlation.rs`, `subpixel.rs` and `register.rs`'s own tests. The recoloured region and its bbox assertions moved to `(96, 96)`, `64x64`, clear of the anchors; measured ratio after the fix is well above `REFUSAL_THRESHOLD`.
 - **Files modified:** `crates/chrys-core/src/lib.rs` (test module only)
 - **Verification:** `cargo test -p chrys-core --lib tests::a_recoloured_rectangle_returns_one_recoloured_region` passes; `cargo test --workspace` reports 84 tests passing, 0 failing.
-- **Committed in:** `61e4e6a`
+- **Committed in:** `9c44dc6`
 
 ---
 
@@ -232,7 +232,7 @@ All files below were verified present on disk and all commit hashes verified pre
 - `crates/chrys-core/tests/refusal.rs` — FOUND
 - `crates/chrys-cli/tests/refusal.rs` — FOUND
 - `tests/golden/refuse-01/should-register/pair-01/base.png`, `tests/golden/refuse-01/should-refuse/pair-01/base.png` — FOUND
-- Commits `d03015f`, `61e4e6a` — FOUND in `git log --oneline`
+- Commits `f26ca15`, `9c44dc6` — FOUND in `git log --oneline`
 
 ---
 *Phase: 01-raster-engine-and-determinism-proof*

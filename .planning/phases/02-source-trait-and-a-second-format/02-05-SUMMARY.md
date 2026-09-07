@@ -21,7 +21,7 @@ actuals:
   tokens: 8620
   tasks: 3
   commits: 3
-  plan_head_before: 963e25331f82c9ff3842e01e9fa672ecfaaed245
+  plan_head_before: 3afb21913bf08e8284e5e6c372d815290bed3cda
 
 # Tech tracking
 tech-stack:
@@ -137,7 +137,7 @@ coverage:
     requirement: SRC-09
     verification:
       - kind: other
-        ref: "git diff --name-only 6633ece^..7ad4829 -- crates/chrys-core/ (empty output); cargo tree -p chrys-core -e normal (no serde, no toml, no format crate)"
+        ref: "git diff --name-only c11a9ef^..27f7687 -- crates/chrys-core/ (empty output); cargo tree -p chrys-core -e normal (no serde, no toml, no format crate)"
         status: pass
     human_judgment: false
 
@@ -167,16 +167,16 @@ status: complete
 - Added six hardening tests to `hints.rs`: a present/missing sidecar (Task 1), and invalid TOML, an unknown key, a negative coordinate, a non-integer coordinate, and a duplicate region name (Task 2). Each builds its own temporary file; no broken sidecar is committed.
 - Wrote `crates/chrys-cli/tests/region_hint.rs`: `region_hint` runs the built binary twice over `tests/golden/hint-01`, asserting the `--region logo` run exits 0 and prints `identical\n`, and the same pair without it does not exit 0 and does not print that line. A second test, `an_unknown_region_name_exits_non_zero_and_names_the_declared_regions`, asserts a mistyped region exits non-zero and stderr names `logo`.
 - Wrote `crates/chrys-source/tests/manifest.rs`: `chrys_source_declares_no_dependency` reads `chrys-source/Cargo.toml` as text and, by a hand line scan (no TOML crate), asserts every line from the `[dependencies]` header to the next section header is blank or a comment. Proved it can go red in a disposable git worktree before trusting it (recorded verbatim below).
-- `git rev-parse HEAD:crates/chrys-core` read `63aad81ddee9939047b1436a33eed8f0896da409` after every commit in this plan, and `git diff --name-only 6633ece^..7ad4829 -- crates/chrys-core/` printed nothing across the whole plan.
+- `git rev-parse HEAD:crates/chrys-core` read `63aad81ddee9939047b1436a33eed8f0896da409` after every commit in this plan, and `git diff --name-only c11a9ef^..27f7687 -- crates/chrys-core/` printed nothing across the whole plan.
 - `cargo build --workspace`, `cargo test --workspace` (175 tests, 0 failed), `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo fmt --check` all pass.
 
 ## Task Commits
 
 Each task was committed atomically:
 
-1. **Task 1: Crop a frame to a named hint and compare inside it** - `6633ece`
-2. **Task 2: Refuse a hint that does not fit the frame** - `d8bd229`
-3. **Task 3: Prove the engine registers inside the named region** - `7ad4829`
+1. **Task 1: Crop a frame to a named hint and compare inside it** - `c11a9ef`
+2. **Task 2: Refuse a hint that does not fit the frame** - `f2e122f`
+3. **Task 3: Prove the engine registers inside the named region** - `27f7687`
 
 **Plan metadata:** pending (this SUMMARY and STATE.md/ROADMAP.md updates are committed by the orchestrator, per this plan's execution instructions)
 
@@ -211,7 +211,7 @@ Each task was committed atomically:
 - **Fix:** Moved the test (and its `patterned_frame` helper) to the crate root, guarded by `#[cfg(test)]`, so its full path is the bare `crop_to_region` the `--exact` filter expects.
 - **Files modified:** `crates/chrys-source/src/lib.rs`
 - **Verification:** `cargo test -p chrys-source crop_to_region -- --exact` now reports `1 passed`.
-- **Committed in:** `6633ece` (Task 1 commit)
+- **Committed in:** `c11a9ef` (Task 1 commit)
 
 **2. [Observation, not a code change] The plan's `sed`-based engine-tree check does not match 02-02-SUMMARY.md's actual heading**
 - **Found during:** verifying the `test "$(git rev-parse HEAD:crates/chrys-core)" = "$(sed -n 's/^engine tree: //p' ...)"` command every task's `<verify>` block specifies.
@@ -307,13 +307,13 @@ The two runs over the same pair disagree, which is the observable meaning of SRC
 
 ## Engine Boundary, This Plan's Own Commit Range
 
-`git diff --name-only 6633ece^..7ad4829 -- crates/chrys-core/`:
+`git diff --name-only c11a9ef^..27f7687 -- crates/chrys-core/`:
 
 ```
 (empty)
 ```
 
-`git rev-parse HEAD:crates/chrys-core` after this plan's last commit (`7ad4829`): `63aad81ddee9939047b1436a33eed8f0896da409`, identical to the id `02-02-SUMMARY.md` recorded and to the id read after each of this plan's own three commits.
+`git rev-parse HEAD:crates/chrys-core` after this plan's last commit (`27f7687`): `63aad81ddee9939047b1436a33eed8f0896da409`, identical to the id `02-02-SUMMARY.md` recorded and to the id read after each of this plan's own three commits.
 
 ## Full Verification, This Plan's End State
 
@@ -339,7 +339,7 @@ cargo tree -p chrys-core -e normal: no serde, no toml, no format or GPU crate.
 
 ## Self-Check: PASSED
 
-All created files verified present on disk (`crates/chrys-source-raster/src/hints.rs`, `crates/chrys-cli/tests/region_hint.rs`, `crates/chrys-source/tests/manifest.rs`, `tests/golden/hint-01/base.png`, `tests/golden/hint-01/base.hints.toml`, `tests/golden/hint-01/candidate.png`, `tests/golden/hint-01/candidate.hints.toml`); all three task commit hashes (`6633ece`, `d8bd229`, `7ad4829`) verified present in `git log --oneline`; `git rev-parse HEAD:crates/chrys-core` verified reading `63aad81ddee9939047b1436a33eed8f0896da409` after the final commit.
+All created files verified present on disk (`crates/chrys-source-raster/src/hints.rs`, `crates/chrys-cli/tests/region_hint.rs`, `crates/chrys-source/tests/manifest.rs`, `tests/golden/hint-01/base.png`, `tests/golden/hint-01/base.hints.toml`, `tests/golden/hint-01/candidate.png`, `tests/golden/hint-01/candidate.hints.toml`); all three task commit hashes (`c11a9ef`, `f2e122f`, `27f7687`) verified present in `git log --oneline`; `git rev-parse HEAD:crates/chrys-core` verified reading `63aad81ddee9939047b1436a33eed8f0896da409` after the final commit.
 
 ---
 *Phase: 02-source-trait-and-a-second-format*

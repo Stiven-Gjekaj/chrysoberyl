@@ -21,7 +21,7 @@ actuals:
   tokens: 12884
   tasks: 3
   commits: 3
-plan_head_before: 16be6266dba0bdc736e162ac4a42bff50c83cc98
+plan_head_before: c6ae5ee0d757d4d2e7c5b10c191e199523c0a348
 
 # Tech tracking
 tech-stack:
@@ -168,9 +168,9 @@ status: complete
 
 ## Task Commits
 
-1. **Task 1: Group changed pixels into labelled regions with bounding boxes** - `e02b0aa` (code + test: `chrys-core/src/classify/{mod,label}.rs`, `chrys-core/src/lib.rs`, `chrys-core/Cargo.toml`, `chrys-core/tests/classify.rs`)
-2. **Task 2: Drop a difference that is only antialiasing** - `e611fa3` (code + test: `chrys-core/src/classify/{mod,antialias}.rs`, `chrys-core/src/lib.rs`, `chrys-core/tests/classify.rs`)
-3. **Task 3: Name every region by kind, and report a colour change with both colours** - `c901391` (code + test: `chrys-core/src/classify/{mod,colour,kind}.rs`, `chrys-core/src/{lib,verdict}.rs`, `chrys-core/Cargo.toml`, `chrys-core/tests/classify.rs`)
+1. **Task 1: Group changed pixels into labelled regions with bounding boxes** - `d148ee5` (code + test: `chrys-core/src/classify/{mod,label}.rs`, `chrys-core/src/lib.rs`, `chrys-core/Cargo.toml`, `chrys-core/tests/classify.rs`)
+2. **Task 2: Drop a difference that is only antialiasing** - `6c153c4` (code + test: `chrys-core/src/classify/{mod,antialias}.rs`, `chrys-core/src/lib.rs`, `chrys-core/tests/classify.rs`)
+3. **Task 3: Name every region by kind, and report a colour change with both colours** - `5180864` (code + test: `chrys-core/src/classify/{mod,colour,kind}.rs`, `chrys-core/src/{lib,verdict}.rs`, `chrys-core/Cargo.toml`, `chrys-core/tests/classify.rs`)
 
 **Plan metadata:** commit pending (this SUMMARY — orchestrator owns STATE.md/ROADMAP.md writes per the objective given to this executor)
 
@@ -213,7 +213,7 @@ Recorded in `antialias.rs`'s own module doc comment, and repeated here per this 
 - **Fix:** Repainted the base's inner rectangle to a distinct mid-grey (`[180, 180, 180, 255]`), not equal to the frame's background, the anchor rectangles, or the moat, so the fixture is unambiguously "existing content that changed colour" rather than "content added on background." Added a comment at the paint call explaining why this specific colour choice now matters.
 - **Files modified:** `crates/chrys-core/src/lib.rs`
 - **Verification:** `cargo test -p chrys-core --lib tests::a_recoloured_rectangle_returns_one_recoloured_region` passes with the same bounding box the test has always asserted, now with `delta.base == [180, 180, 180, 255]`; `cargo test --workspace` reports 132 tests passing, 0 failing.
-- **Committed in:** `c901391` (found and fixed before Task 3's own commit)
+- **Committed in:** `5180864` (found and fixed before Task 3's own commit)
 
 **2. [Rule 3 - Blocking issue] A rejected-crate name appeared inside this plan's own dependency comment, tripping its own grep gate**
 - **Found during:** Task 3, running the plan's own verify command for the rejected-crate count
@@ -221,7 +221,7 @@ Recorded in `antialias.rs`'s own module doc comment, and repeated here per this 
 - **Fix:** Reworded the comment to describe the rejection without naming either crate, pointing to `01-RESEARCH.md`'s own Alternatives Considered table for the names, and to explain that naming them in the manifest would defeat the gate's own purpose.
 - **Files modified:** `crates/chrys-core/Cargo.toml`
 - **Verification:** `test "$(grep -c 'empfindung\|delta_e' crates/chrys-core/Cargo.toml)" = "0"` passes.
-- **Committed in:** `c901391` (found and fixed before Task 3's own commit)
+- **Committed in:** `5180864` (found and fixed before Task 3's own commit)
 
 ---
 
@@ -249,7 +249,7 @@ None - no external service configuration required.
 All files below were verified present on disk and all three commit hashes verified present in `git log --oneline` on this branch before this line was written:
 - `crates/chrys-core/src/classify/mod.rs`, `label.rs`, `antialias.rs`, `colour.rs`, `kind.rs` — FOUND
 - `crates/chrys-core/tests/classify.rs` — FOUND
-- Commits `e02b0aa`, `e611fa3`, `c901391` — FOUND in `git log --oneline`
+- Commits `d148ee5`, `6c153c4`, `5180864` — FOUND in `git log --oneline`
 
 ---
 *Phase: 01-raster-engine-and-determinism-proof*

@@ -7,7 +7,7 @@ tags: [ci, determinism, drill, github-actions, bash]
 # Dependency graph
 requires:
   - phase: 02-source-trait-and-a-second-format
-    provides: "chrys-source-animation, the animation Source adapter, and its commit range (31ec06e..9547de2) which changed no file under crates/chrys-core/ (02-03)"
+    provides: "chrys-source-animation, the animation Source adapter, and its commit range (d81381b..d1c1e51) which changed no file under crates/chrys-core/ (02-03)"
 provides:
   - "scripts/engine-boundary-drill.sh, a re-runnable drill that plants a cross-boundary defect and proves the engine-boundary check can go red and name the file"
   - "the recorded live measurement of the engine-boundary check over plan 02-03's real commit range"
@@ -20,7 +20,7 @@ actuals:
   tokens: 2809
   tasks: 2
   commits: 3
-  plan_head_before: e78e224a6c4e175d4a22eb93d616fb1e7750f8c1
+  plan_head_before: 4c8c3dfe00f5c5689ef03f2bd33d9162933ea837
 
 # Tech tracking
 tech-stack:
@@ -51,7 +51,7 @@ coverage:
     requirement: SRC-08
     verification:
       - kind: other
-        ref: "sh scripts/engine-boundary-drill.sh 31ec06eecd82bb0aff70b3bc9fe7b69aeee75de1 9547de222e33370ae72a10bd4653dfee81e1b7d0 (drill one: 'drill ok: planted-defect drill: the check went red and named crates/chrys-core/src/lib.rs')"
+        ref: "sh scripts/engine-boundary-drill.sh d81381b93fd147c33c1df59557c39222696ca668 d1c1e51e54d5b82c0dd2aa04262f0114f24e324f (drill one: 'drill ok: planted-defect drill: the check went red and named crates/chrys-core/src/lib.rs')"
         status: pass
     human_judgment: false
   - id: D2
@@ -59,7 +59,7 @@ coverage:
     requirement: SRC-08
     verification:
       - kind: other
-        ref: "sh scripts/engine-boundary-drill.sh 31ec06eecd82bb0aff70b3bc9fe7b69aeee75de1 9547de222e33370ae72a10bd4653dfee81e1b7d0 (drill two: 'drill ok: clean-range drill: the check stayed silent over plan 02-03's own range')"
+        ref: "sh scripts/engine-boundary-drill.sh d81381b93fd147c33c1df59557c39222696ca668 d1c1e51e54d5b82c0dd2aa04262f0114f24e324f (drill two: 'drill ok: clean-range drill: the check stayed silent over plan 02-03's own range')"
         status: pass
     human_judgment: false
   - id: D3
@@ -116,7 +116,7 @@ status: complete
 
 - Built `scripts/engine-boundary-drill.sh` as a sibling of `scripts/determinism-drill.sh`, following its exact shape: `set -u`, repo-root resolution from `$0`, a dirty-tree refusal that explains why, a `mktemp -d` worktree created with `git worktree add --detach --quiet`, a `cleanup` function installed with `trap cleanup EXIT INT TERM`, and pass/fail counters printing `drill ok:` or `DRILL FAILED:` per drill.
 - Drill one plants a defect inside the worktree: an appended comment line in `crates/chrys-core/src/lib.rs` committed together with a comment line in `crates/chrys-source-animation/src/lib.rs`, so the planted commit looks like a real wave commit that happens to reach the engine. The check (`git diff --name-only <range> -- crates/chrys-core/`) went red and named `crates/chrys-core/src/lib.rs` exactly — not merely non-empty output, the specific planted path.
-- Drill two runs the identical check over plan 02-03's real commit range (`31ec06eecd82bb0aff70b3bc9fe7b69aeee75de1^..9547de222e33370ae72a10bd4653dfee81e1b7d0`, read from `02-03-SUMMARY.md`'s recorded first/last commit lines) and confirms empty output — the pass condition SRC-08's claim rests on.
+- Drill two runs the identical check over plan 02-03's real commit range (`d81381b93fd147c33c1df59557c39222696ca668^..d1c1e51e54d5b82c0dd2aa04262f0114f24e324f`, read from `02-03-SUMMARY.md`'s recorded first/last commit lines) and confirms empty output — the pass condition SRC-08's claim rests on.
 - The script takes the commit range as `$1` and `$2` with a usage message naming both when missing, holding no hash of its own, so it stays re-runnable against any wave's range.
 - Verified `git status --porcelain` prints nothing and `git worktree list` shows no orphaned worktree after a full run, in both the pass and the no-args-usage case.
 - Extended the `digest` job in `.github/workflows/determinism.yml`: `tests/golden/pair-01`'s four lines stay first, unprefixed and byte-identical to phase 1; four new sections follow, each introduced by an `== path ==` header line written into `digest.txt` itself, for `sequence-01`, `gif`, `apng` and `webp-anim`.
@@ -130,21 +130,21 @@ status: complete
 
 Each task was committed atomically:
 
-1. **Task 1: Drill the engine boundary check with a planted defect** - `6ff077b16969f02e0024b696866dae70ba02b16d`
-2. **Task 2: Extend the determinism matrix with the new fixture pairs** - `c4a001abf84bdc957a5f2e605b694a202dca8d71`
+1. **Task 1: Drill the engine boundary check with a planted defect** - `5b4c4511a5db67bf7c853e2bef64dcf9f946795c`
+2. **Task 2: Extend the determinism matrix with the new fixture pairs** - `ce320793eb8763dd827be67fd3c5ab6cc2dd0771`
 
 **Plan metadata:** pending (STATE.md and ROADMAP.md updates are the orchestrator's, per this plan's own execution instructions; this SUMMARY.md is committed directly by this plan)
 
 ## Boundary drill: full verbatim output
 
-Command run: `sh scripts/engine-boundary-drill.sh 31ec06eecd82bb0aff70b3bc9fe7b69aeee75de1 9547de222e33370ae72a10bd4653dfee81e1b7d0`
+Command run: `sh scripts/engine-boundary-drill.sh d81381b93fd147c33c1df59557c39222696ca668 d1c1e51e54d5b82c0dd2aa04262f0114f24e324f`
 
 ```
-engine-boundary-drill: drill one: checked range c4a001abf84bdc957a5f2e605b694a202dca8d71..b0413d0fe700556457503a87fc41c38829787119
+engine-boundary-drill: drill one: checked range ce320793eb8763dd827be67fd3c5ab6cc2dd0771..b0413d0fe700556457503a87fc41c38829787119
 engine-boundary-drill: drill one: check output:
 crates/chrys-core/src/lib.rs
 drill ok: planted-defect drill: the check went red and named crates/chrys-core/src/lib.rs
-engine-boundary-drill: drill two: checked range 31ec06eecd82bb0aff70b3bc9fe7b69aeee75de1^..9547de222e33370ae72a10bd4653dfee81e1b7d0
+engine-boundary-drill: drill two: checked range d81381b93fd147c33c1df59557c39222696ca668^..d1c1e51e54d5b82c0dd2aa04262f0114f24e324f
 engine-boundary-drill: drill two: check output:
 (empty)
 drill ok: clean-range drill: the check stayed silent over plan 02-03's own range
@@ -154,7 +154,7 @@ engine-boundary-drill: 2 of 2 drills behaved as expected
 
 Exit code: `0`.
 
-Note: the range printed for drill one (`c4a001ab..b0413d0f`) is the planted commit and its parent, both created and destroyed inside the disposable worktree on this particular run; a re-run creates a fresh pair of throwaway hashes. Drill two's range (`31ec06e^..9547de2`) is plan 02-03's real, permanent commit range and is the one this plan measures.
+Note: the range printed for drill one (`ce320793..b0413d0f`) is the planted commit and its parent, both created and destroyed inside the disposable worktree on this particular run; a re-run creates a fresh pair of throwaway hashes. Drill two's range (`d81381b^..d1c1e51`) is plan 02-03's real, permanent commit range and is the one this plan measures.
 
 After this run: `git status --porcelain` printed nothing, and `git worktree list` showed only this agent's own worktree — no orphaned drill worktree remained.
 
@@ -213,7 +213,7 @@ None - no external service configuration required.
 
 ## Self-Check: PASSED
 
-`scripts/engine-boundary-drill.sh` verified present on disk and executable; both task commit hashes (`6ff077b16969f02e0024b696866dae70ba02b16d`, `c4a001abf84bdc957a5f2e605b694a202dca8d71`) verified present in `git log --oneline`; `git rev-parse HEAD:crates/chrys-core` verified reading `63aad81ddee9939047b1436a33eed8f0896da409` after both task commits.
+`scripts/engine-boundary-drill.sh` verified present on disk and executable; both task commit hashes (`5b4c4511a5db67bf7c853e2bef64dcf9f946795c`, `ce320793eb8763dd827be67fd3c5ab6cc2dd0771`) verified present in `git log --oneline`; `git rev-parse HEAD:crates/chrys-core` verified reading `63aad81ddee9939047b1436a33eed8f0896da409` after both task commits.
 
 ---
 *Phase: 02-source-trait-and-a-second-format*

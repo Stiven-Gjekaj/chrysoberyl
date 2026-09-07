@@ -29,7 +29,7 @@ actuals:
   tokens: 10335
   tasks: 3
   commits: 9
-plan_head_before: bd78396ac6650b15635e1f4d97102d28dd4f38d6
+plan_head_before: ece16c8360eac843594d2faf6517fdcf745de829
 
 # Tech tracking
 tech-stack:
@@ -139,7 +139,7 @@ status: complete
 
 ## Performance
 
-- **Duration:** 37 min (measured between the plan's own commit, `bd78396`, and this plan's final commit, `c788d5f`)
+- **Duration:** 37 min (measured between the plan's own commit, `ece16c8`, and this plan's final commit, `07d0788`)
 - **Completed:** 2026-09-07
 - **Tasks:** 3
 - **Files modified:** 15 (3 created, 12 modified)
@@ -152,15 +152,15 @@ status: complete
 
 ## Task Commits
 
-1. **Task 1a: Build the committed pair** - `394063d` (fixture: `tests/golden/alpha-01/base.png`, `candidate.png`, generator in `crates/chrys-source-raster/examples/make-fixtures.rs`)
-2. **Task 1b: Compare the alpha channel and report a change** - `b175906` (engine: `warp.rs`, `block_match.rs`, `label.rs`, `residual.rs`; tests: `tests/classify.rs`, `tests/block_match.rs`, new `crates/chrys-cli/tests/alpha.rs`; baseline: `expected-digest.sha256`)
-3. **Task 2a: Suppress every channel of a residual the antialiasing rule accepts** - `5ad54b2` (`antialias.rs`, `tests/classify.rs`)
-4. **Task 2b: Weigh alpha into the brightness the antialiasing rule reads** - `bf3583c` (`antialias.rs`, `tests/classify.rs`)
-5. **Task 3a: Treat a fully transparent region as absent when a change is named** - `956513f` (`kind.rs`, `tests/classify.rs`, `crates/chrys-cli/tests/alpha.rs`)
-6. **Task 3b: Name the alpha difference in a colour change** - `5e0b609` (`verdict.rs`, `tests/classify.rs`)
-7. **Task 3c: Hash the alpha pair on every runner** - `475189e` (`.github/workflows/determinism.yml`)
-8. **Task 3c fix (Rule 3 - blocking issue): word the digest heading so it names the fixture once** - `6afd34f` (`.github/workflows/determinism.yml`)
-9. **Formatting fix (Rule 1 - trivial)** - `c788d5f` (`tests/classify.rs`)
+1. **Task 1a: Build the committed pair** - `4cc6fea` (fixture: `tests/golden/alpha-01/base.png`, `candidate.png`, generator in `crates/chrys-source-raster/examples/make-fixtures.rs`)
+2. **Task 1b: Compare the alpha channel and report a change** - `0e6cccc` (engine: `warp.rs`, `block_match.rs`, `label.rs`, `residual.rs`; tests: `tests/classify.rs`, `tests/block_match.rs`, new `crates/chrys-cli/tests/alpha.rs`; baseline: `expected-digest.sha256`)
+3. **Task 2a: Suppress every channel of a residual the antialiasing rule accepts** - `a7679ae` (`antialias.rs`, `tests/classify.rs`)
+4. **Task 2b: Weigh alpha into the brightness the antialiasing rule reads** - `354565f` (`antialias.rs`, `tests/classify.rs`)
+5. **Task 3a: Treat a fully transparent region as absent when a change is named** - `e840e9d` (`kind.rs`, `tests/classify.rs`, `crates/chrys-cli/tests/alpha.rs`)
+6. **Task 3b: Name the alpha difference in a colour change** - `a36e998` (`verdict.rs`, `tests/classify.rs`)
+7. **Task 3c: Hash the alpha pair on every runner** - `f8ae38d` (`.github/workflows/determinism.yml`)
+8. **Task 3c fix (Rule 3 - blocking issue): word the digest heading so it names the fixture once** - `8a69a34` (`.github/workflows/determinism.yml`)
+9. **Formatting fix (Rule 1 - trivial)** - `07d0788` (`tests/classify.rs`)
 
 ## Files Created/Modified
 
@@ -193,7 +193,7 @@ See `key-decisions` in the frontmatter. In short: alpha is now part of what "cha
 - **Fix:** Reworded the heading to `echo "== alpha-01 (gap G-01-1) =="`, which still names the fixture and the gap it closes, still appears as a heading line before the digest block, but does not repeat the literal substring `golden/alpha-01` a second time. The fixture's own path now appears on exactly one report line (the compare command), satisfying the verify gate exactly as written, with the same two-line shape (heading + compare line) every other headed pair already has.
 - **Files modified:** `.github/workflows/determinism.yml`
 - **Verification:** `grep -v '^[[:space:]]*#' .github/workflows/determinism.yml | grep -c 'golden/alpha-01'` now returns `1`. The six-label matrix, the `agree` job and the `guards` job are unchanged (confirmed by grep counts below).
-- **Committed in:** `6afd34f`
+- **Committed in:** `8a69a34`
 
 **2. [Rule 1 - Formatting] `cargo fmt --check` failed on a long test-helper signature**
 
@@ -202,7 +202,7 @@ See `key-decisions` in the frontmatter. In short: alpha is now part of what "cha
 - **Fix:** Ran `cargo fmt`; it wrapped the signature onto one argument per line. No behaviour change.
 - **Files modified:** `crates/chrys-core/tests/classify.rs`
 - **Verification:** `cargo fmt --check` exits 0; `cargo test --workspace` unaffected.
-- **Committed in:** `c788d5f`
+- **Committed in:** `07d0788`
 
 ---
 
@@ -210,7 +210,7 @@ See `key-decisions` in the frontmatter. In short: alpha is now part of what "cha
 
 ## Digest audit (all six fixture pairs, plan start vs. this plan's final commit)
 
-Measured by building the CLI binary at the plan's own starting commit (`bd78396`, the commit that added `01-09-PLAN.md`, before any of this plan's own tasks ran) in one temporary git worktree, and at this plan's final commit in the working tree, then running `chrys compare ... --hash-only` on each fixture from both binaries and diffing line by line. `tests/golden/alpha-01` did not exist at `bd78396` (this plan created it in Task 1), so its own "before" row instead compares the fixture-only commit `394063d` (fixture and generator committed, engine not yet touched — the defect measured in Task 1) against this plan's final commit.
+Measured by building the CLI binary at the plan's own starting commit (`ece16c8`, the commit that added `01-09-PLAN.md`, before any of this plan's own tasks ran) in one temporary git worktree, and at this plan's final commit in the working tree, then running `chrys compare ... --hash-only` on each fixture from both binaries and diffing line by line. `tests/golden/alpha-01` did not exist at `ece16c8` (this plan created it in Task 1), so its own "before" row instead compares the fixture-only commit `4cc6fea` (fixture and generator committed, engine not yet touched — the defect measured in Task 1) against this plan's final commit.
 
 | Fixture | `decode-base` | `decode-candidate` | `residual` | `verdict` | Reason |
 |---|---|---|---|---|---|
@@ -246,7 +246,7 @@ No file under `crates/chrys-core/tests/determinism.rs` was edited by this plan. 
 
 ## Measured defect, before and after (Task 1)
 
-Before the engine change (fixture `tests/golden/alpha-01` committed, engine untouched, commit `394063d`):
+Before the engine change (fixture `tests/golden/alpha-01` committed, engine untouched, commit `4cc6fea`):
 
 ```
 $ chrys compare tests/golden/alpha-01/base.png tests/golden/alpha-01/candidate.png
@@ -290,7 +290,7 @@ All files below were verified present on disk, and all commit hashes verified pr
 - `crates/chrys-cli/tests/alpha.rs` — FOUND
 - `crates/chrys-core/src/classify/kind.rs` (rewritten absence predicate) — FOUND
 - `.github/workflows/determinism.yml` (alpha pair in digest job) — FOUND
-- Commits `394063d`, `b175906`, `5ad54b2`, `bf3583c`, `956513f`, `5e0b609`, `475189e`, `6afd34f`, `c788d5f` — FOUND in `git log --oneline`
+- Commits `4cc6fea`, `0e6cccc`, `a7679ae`, `354565f`, `e840e9d`, `a36e998`, `f8ae38d`, `8a69a34`, `07d0788` — FOUND in `git log --oneline`
 
 ---
 *Phase: 01-raster-engine-and-determinism-proof*

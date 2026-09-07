@@ -23,7 +23,7 @@ actuals:
   tokens: 12098
   tasks: 4
   commits: 5
-plan_head_before: 09916d64e428ee0c1deb9fe6b034b99b63d4899a
+plan_head_before: 93171627e32d314f032f1b2f351483ab7e1ab004
 
 # Tech tracking
 tech-stack:
@@ -154,7 +154,7 @@ status: complete
 
 ## Performance
 
-- **Duration:** 90 min (measured between this plan's final commit, `542bfc9`, and 01-07's final commit, `09916d6`)
+- **Duration:** 90 min (measured between this plan's final commit, `52bfcae`, and 01-07's final commit, `9317162`)
 - **Completed:** 2026-09-06
 - **Tasks:** 4 (Task 0, orchestrator-added, plus the plan's own Tasks 1-3)
 - **Files modified:** 8 (3 created, 5 modified, including `Cargo.lock`)
@@ -168,11 +168,11 @@ status: complete
 
 ## Task Commits
 
-0. **Task 0 (orchestrator addition): Own connected-component labelling and drop imageproc** - `cf45e5d` (code + test: `crates/chrys-core/src/classify/label.rs`, `crates/chrys-core/Cargo.toml`, `Cargo.toml`, `Cargo.lock`)
-1. **Task 1: Guard the comparison path against platform maths** - `0811fb5` (test: `crates/chrys-core/tests/determinism.rs`)
-2. **Task 2: Keep the GPU out, and compare two architectures on one machine** - `ee69f58` (test + script + CI: `crates/chrys-core/tests/determinism.rs`, `scripts/cross-arch-hash.sh`, `.github/workflows/determinism.yml`)
-3. **Task 3, part 1: Add the re-runnable drill** - `51288b0` (script: `scripts/determinism-drill.sh`)
-3. **Task 3, part 2: Add a static guard for the auto-dispatching FFT planner (fix found by the drill's first run)** - `542bfc9` (test + script: `crates/chrys-core/tests/determinism.rs`, `scripts/determinism-drill.sh`)
+0. **Task 0 (orchestrator addition): Own connected-component labelling and drop imageproc** - `0667c65` (code + test: `crates/chrys-core/src/classify/label.rs`, `crates/chrys-core/Cargo.toml`, `Cargo.toml`, `Cargo.lock`)
+1. **Task 1: Guard the comparison path against platform maths** - `3ffe4b5` (test: `crates/chrys-core/tests/determinism.rs`)
+2. **Task 2: Keep the GPU out, and compare two architectures on one machine** - `e592e20` (test + script + CI: `crates/chrys-core/tests/determinism.rs`, `scripts/cross-arch-hash.sh`, `.github/workflows/determinism.yml`)
+3. **Task 3, part 1: Add the re-runnable drill** - `82e664e` (script: `scripts/determinism-drill.sh`)
+3. **Task 3, part 2: Add a static guard for the auto-dispatching FFT planner (fix found by the drill's first run)** - `52bfcae` (test + script: `crates/chrys-core/tests/determinism.rs`, `scripts/determinism-drill.sh`)
 
 **Plan metadata:** commit pending (this SUMMARY — orchestrator owns STATE.md/ROADMAP.md writes per the objective given to this executor)
 
@@ -202,7 +202,7 @@ See `key-decisions` in the frontmatter for the full list with reasons. In short:
 - **Fix:** Added a fifth test to `crates/chrys-core/tests/determinism.rs`, `the_comparison_path_never_constructs_the_auto_dispatching_fft_planner`, a static source guard that searches for the literal construction of `rustfft`'s auto-dispatching `FftPlanner` and fails, naming the file and line, independent of any machine's CPU features. Updated the planner drill in `scripts/determinism-drill.sh` to treat this new guard as its primary, decisive check; `cross-arch-hash.sh` still runs as part of the drill and its result is still printed, as evidence, but no longer decides the drill's outcome.
 - **Files modified:** `crates/chrys-core/tests/determinism.rs`, `scripts/determinism-drill.sh`
 - **Verification:** Re-ran the drill; the static guard test goes red and names `window.rs` when the planted mutation is present, and the drill now reports `drill ok` for the planner drill. Both attempts' transcripts are recorded below.
-- **Committed in:** `542bfc9`
+- **Committed in:** `52bfcae`
 
 **2. [Rule 2 - Missing critical functionality / architectural, orchestrator-directed] Own connected-component labelling and drop `imageproc`**
 
@@ -211,7 +211,7 @@ See `key-decisions` in the frontmatter for the full list with reasons. In short:
 - **Fix:** Replaced the `imageproc` call with a two-pass, union-find connected-component labeller this repository owns (same algorithm family `imageproc` used, per `research/ARCHITECTURE.md`'s own citation of Wu, Otoo and Suzuki, 2009), keeping eight-way connectivity. The label assignment order (raster scan, smallest label first) is now documented in `label.rs`'s own module doc comment as this project's own decision. Removed `imageproc` from both the workspace manifest and `chrys-core`'s own manifest, which also dropped its unused ~90-crate transitive graph (`rav1e`, `ravif`, `nalgebra`, `glam`, `rayon`, `rand`, and others — none of which the connected-component call ever used).
 - **Files modified:** `crates/chrys-core/src/classify/label.rs`, `crates/chrys-core/Cargo.toml`, `Cargo.toml`, `Cargo.lock`
 - **Verification:** All 21 `classify.rs` tests pass unchanged; `cargo test --workspace` reports 132 tests passing (unchanged from 01-07's baseline, before this plan's own new `determinism.rs` tests); the `tests/golden/pair-01/` verdict digest is unchanged at `33142d19a0b218aea7528f4e6312e7eef7655bd7fbdb4c68799734e3dd2ed823`; `cargo tree -p chrys-core -e normal` shows exactly `chrys-source`, `libm`, `palette`, `rustfft`, `sha2`, `thiserror` and nothing else, matching this plan's own strengthened dependency guard.
-- **Committed in:** `cf45e5d`
+- **Committed in:** `0667c65`
 
 ---
 
@@ -320,7 +320,7 @@ All files below were verified present on disk, and all five commit hashes verifi
 - `scripts/cross-arch-hash.sh` (executable) — FOUND
 - `scripts/determinism-drill.sh` (executable) — FOUND
 - `.github/workflows/determinism.yml` (guards job present) — FOUND
-- Commits `cf45e5d`, `0811fb5`, `ee69f58`, `51288b0`, `542bfc9` — FOUND in `git log --oneline`
+- Commits `0667c65`, `3ffe4b5`, `e592e20`, `82e664e`, `52bfcae` — FOUND in `git log --oneline`
 
 ---
 *Phase: 01-raster-engine-and-determinism-proof*

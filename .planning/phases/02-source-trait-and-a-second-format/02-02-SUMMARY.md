@@ -112,9 +112,9 @@ status: complete
 
 Each task was committed atomically:
 
-1. **Task 1: Guard that the engine keeps one comparison pipeline** - `7aea562`
-2. **Task 2: Commit the four phase 1 digests as a regression fixture** - `ddc41c4`
-3. **Task 3: Report one digest block per frame index** - `31ed55f`
+1. **Task 1: Guard that the engine keeps one comparison pipeline** - `75e4acd`
+2. **Task 2: Commit the four phase 1 digests as a regression fixture** - `7f812ae`
+3. **Task 3: Report one digest block per frame index** - `630e204`
 
 **Plan metadata:** pending (this SUMMARY and STATE.md/ROADMAP.md updates are committed by the orchestrator, per this plan's execution instructions)
 
@@ -235,7 +235,7 @@ cargo fmt --check: clean.
 
 ## engine tree: 63aad81ddee9939047b1436a33eed8f0896da409
 
-That id is `git rev-parse HEAD:crates/chrys-core`, read after this plan's last commit (`31ed55f`), which touched only `crates/chrys-cli` and `tests/golden/`. It is identical to the tree id measured immediately after Task 1's commit (`7aea562`, the last commit in this plan that touched a file under `crates/chrys-core/`), confirmed by `git rev-parse 7aea562:crates/chrys-core` returning the same value. This is the last plan in this phase permitted to change a file under `crates/chrys-core/`; from here on, "no engine change" for waves 3, 4 and 5 means this tree id does not move.
+That id is `git rev-parse HEAD:crates/chrys-core`, read after this plan's last commit (`630e204`), which touched only `crates/chrys-cli` and `tests/golden/`. It is identical to the tree id measured immediately after Task 1's commit (`75e4acd`, the last commit in this plan that touched a file under `crates/chrys-core/`), confirmed by `git rev-parse 75e4acd:crates/chrys-core` returning the same value. This is the last plan in this phase permitted to change a file under `crates/chrys-core/`; from here on, "no engine change" for waves 3, 4 and 5 means this tree id does not move.
 
 ## Next Phase Readiness
 
@@ -246,7 +246,7 @@ That id is `git rev-parse HEAD:crates/chrys-core`, read after this plan's last c
 
 ## Self-Check: PASSED
 
-All created/modified files verified present on disk (`tests/golden/pair-01/expected-digest.sha256`, `crates/chrys-core/tests/determinism.rs`, `crates/chrys-cli/tests/digest.rs`, `crates/chrys-cli/src/main.rs`); all three task commit hashes (`7aea562`, `ddc41c4`, `31ed55f`) verified present in `git log --oneline`.
+All created/modified files verified present on disk (`tests/golden/pair-01/expected-digest.sha256`, `crates/chrys-core/tests/determinism.rs`, `crates/chrys-cli/tests/digest.rs`, `crates/chrys-cli/src/main.rs`); all three task commit hashes (`75e4acd`, `7f812ae`, `630e204`) verified present in `git log --oneline`.
 
 ---
 *Phase: 02-source-trait-and-a-second-format*

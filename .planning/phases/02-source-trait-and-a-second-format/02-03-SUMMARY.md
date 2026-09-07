@@ -113,7 +113,7 @@ coverage:
     requirement: SRC-08
     verification:
       - kind: other
-        ref: "git diff --name-only 31ec06eecd82bb0aff70b3bc9fe7b69aeee75de1^..9547de222e33370ae72a10bd4653dfee81e1b7d0 -- crates/chrys-core/ (empty output)"
+        ref: "git diff --name-only d81381b93fd147c33c1df59557c39222696ca668^..d1c1e51e54d5b82c0dd2aa04262f0114f24e324f -- crates/chrys-core/ (empty output)"
         status: pass
       - kind: other
         ref: "git rev-parse HEAD:crates/chrys-core == 63aad81ddee9939047b1436a33eed8f0896da409, checked after every commit in this plan"
@@ -153,16 +153,16 @@ status: complete
 
 Each task was committed atomically:
 
-1. **Task 1: Compare a GIF pair through a new animation adapter** - `31ec06e`
-2. **Task 2: Compare an APNG pair through the animation adapter** - `13f3626`
-3. **Task 3: Assemble an animated WebP fixture and prove it round-trips** - `9547de2`
+1. **Task 1: Compare a GIF pair through a new animation adapter** - `d81381b`
+2. **Task 2: Compare an APNG pair through the animation adapter** - `522575d`
+3. **Task 3: Assemble an animated WebP fixture and prove it round-trips** - `d1c1e51`
 
 **Plan metadata:** pending (this SUMMARY, STATE.md and ROADMAP.md updates are committed by the orchestrator, per this plan's execution instructions — this plan's own instructions additionally direct committing this SUMMARY.md directly)
 
-first commit: 31ec06eecd82bb0aff70b3bc9fe7b69aeee75de1
-last commit: 9547de222e33370ae72a10bd4653dfee81e1b7d0
+first commit: d81381b93fd147c33c1df59557c39222696ca668
+last commit: d1c1e51e54d5b82c0dd2aa04262f0114f24e324f
 
-Verbatim output of `git diff --name-only 31ec06eecd82bb0aff70b3bc9fe7b69aeee75de1^..9547de222e33370ae72a10bd4653dfee81e1b7d0 -- crates/chrys-core/`:
+Verbatim output of `git diff --name-only d81381b93fd147c33c1df59557c39222696ca668^..d1c1e51e54d5b82c0dd2aa04262f0114f24e324f -- crates/chrys-core/`:
 
 ```
 (empty)
@@ -206,7 +206,7 @@ round-trip decode .../tests/golden/formats/webp-anim/base.webp: Format error dec
 - **Fix:** Set the "do not blend" bit (`0b0000_0010`) in the ANMF flags byte, routing the decoder through its exact full-canvas-overwrite fast path instead of the approximate blend path. Confirmed correct: the round-trip check then passed for all five frames of both the base and candidate files.
 - **Files modified:** `crates/chrys-source-animation/examples/make-fixtures.rs`
 - **Verification:** `cargo run -p chrys-source-animation --example make-fixtures` completes with no panic; `cargo test -p chrys-source-animation webp_anim -- --exact` passes; the cross-format pixel-identity test (`frame_zero_of_the_gif_and_animated_webp_fixtures_hold_the_same_pixels`) passes.
-- **Committed in:** `9547de2` (Task 3 commit)
+- **Committed in:** `d1c1e51` (Task 3 commit)
 
 ---
 
@@ -224,14 +224,14 @@ None - no external service configuration required.
 ## Next Phase Readiness
 
 - `chrys-source-animation` is a complete, tested Source adapter for GIF, APNG and lossless animated WebP, wired into the CLI, with no file under `crates/chrys-core/` touched across any of this plan's three tasks — SRC-08's claim now holds over a second, harder input family (an adapter dispatching across three formats and a hand-rolled container) than the sequence adapter (02-01) exercised.
-- The engine tree object id `63aad81ddee9939047b1436a33eed8f0896da409`, recorded by plan 02-02, is unchanged after this plan's last commit. Plan 02-04's cross-wave drill can check this commit range (`31ec06eecd82bb0aff70b3bc9fe7b69aeee75de1^..9547de222e33370ae72a10bd4653dfee81e1b7d0`) directly.
+- The engine tree object id `63aad81ddee9939047b1436a33eed8f0896da409`, recorded by plan 02-02, is unchanged after this plan's last commit. Plan 02-04's cross-wave drill can check this commit range (`d81381b93fd147c33c1df59557c39222696ca668^..d1c1e51e54d5b82c0dd2aa04262f0114f24e324f`) directly.
 - `cargo tree -p chrys-core -e normal` still names no format or GPU crate; the new `gif` feature and the new `png` dev-dependency both terminate inside `chrys-source-animation`'s own graph.
 - The four phase-1 digests of `tests/golden/pair-01` and the six determinism guards in `crates/chrys-core/tests/determinism.rs` were verified passing after the final commit.
 - The animated-WebP container assembler and its round-trip check are reusable groundwork: any later phase needing another hand-assembled RIFF-family fixture has a worked, gated example to follow.
 
 ## Self-Check: PASSED
 
-All created files verified present on disk (`crates/chrys-source-animation/{Cargo.toml,src/lib.rs,src/sniff.rs,examples/make-fixtures.rs,tests/animation.rs}`, `tests/golden/formats/{gif,apng,webp-anim}/{base,candidate}.*`); all three task commit hashes (`31ec06e`, `13f3626`, `9547de2`) verified present in `git log --oneline`.
+All created files verified present on disk (`crates/chrys-source-animation/{Cargo.toml,src/lib.rs,src/sniff.rs,examples/make-fixtures.rs,tests/animation.rs}`, `tests/golden/formats/{gif,apng,webp-anim}/{base,candidate}.*`); all three task commit hashes (`d81381b`, `522575d`, `d1c1e51`) verified present in `git log --oneline`.
 
 ---
 *Phase: 02-source-trait-and-a-second-format*

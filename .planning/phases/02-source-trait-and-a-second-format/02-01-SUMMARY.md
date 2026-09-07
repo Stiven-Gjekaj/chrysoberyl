@@ -128,8 +128,8 @@ status: complete
 
 Each task was committed atomically:
 
-1. **Task 1: Make the sequence the only unit and compare one directory pair** - `a4727fe` (feat)
-2. **Task 2: Prove the pairing rules and the natural order a sequence needs** - `ba743a0` (test)
+1. **Task 1: Make the sequence the only unit and compare one directory pair** - `51947f6` (feat)
+2. **Task 2: Prove the pairing rules and the natural order a sequence needs** - `f6d2b61` (test)
 
 **Plan metadata:** pending (this SUMMARY, STATE.md and ROADMAP.md updates are committed by the orchestrator, per this plan's execution instructions)
 
@@ -188,7 +188,7 @@ verdict 33142d19a0b218aea7528f4e6312e7eef7655bd7fbdb4c68799734e3dd2ed823
 
 ## Self-Check: PASSED
 
-All created files verified present on disk; both task commit hashes (`a4727fe`, `ba743a0`) verified present in `git log --oneline --all`.
+All created files verified present on disk; both task commit hashes (`51947f6`, `f6d2b61`) verified present in `git log --oneline --all`.
 
 ---
 *Phase: 02-source-trait-and-a-second-format*

@@ -72,7 +72,7 @@ observed: 6 of 6 guards green; 175 workspace tests pass; clippy clean under
 ### 11. Six runners agree on all five fixture families
 expected: identical digests across three operating systems and two architectures
 result: pass
-observed: GitHub Actions run on `17c9d18`, all six digest jobs plus `agree` plus
+observed: GitHub Actions run on `f493fb0`, all six digest jobs plus `agree` plus
 `guards` green, over `pair-01`, `sequence-01`, `gif`, `apng` and `webp-anim`
 
 ### 12. The per-frame output is readable at length

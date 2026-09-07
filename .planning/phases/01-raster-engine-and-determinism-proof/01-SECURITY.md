@@ -144,7 +144,7 @@ Stated so no reader credits this file with more than it did.
 |------------|---------------|--------|------|--------|
 | 2026-09-07 | 31 | 31 (27 mitigated, 4 accepted) | 0 | orchestrator, ASVS L1 |
 
-Live evidence collected on 2026-09-07 against commit `fdd9016`:
+Live evidence collected on 2026-09-07 against commit `402d07e`:
 
 - 6 of 6 determinism guards pass (`cargo test -p chrys-core --test determinism`).
 - 48 crates in `cargo tree -p chrys-core -e normal`; zero GPU, format, `serde`

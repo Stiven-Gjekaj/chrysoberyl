@@ -128,13 +128,13 @@ status: complete
 
 Landed as an ordered group of commits, per AGENTS.md (one change per commit, code and tests together):
 
-1. **Workspace root and toolchain pin** - `29ed804` (Cargo.toml, rust-toolchain.toml, .gitignore)
-2. **chrys-source crate** - `35dc93c` (feat + test, 3 tests)
-3. **chrys-source-raster adapter** - `c1c50ef` (feat + test, 3 tests)
-4. **chrys-core engine** - `a48aab8` (feat + test, 6 tests)
-5. **chrys-cli binary** - `25e3d94` (feat)
-6. **Golden pair and generator** - `c2da725` (the fixture files)
-7. **cargo fmt cleanup** - `3f7d2f2` (formatting only, no behaviour change)
+1. **Workspace root and toolchain pin** - `401e61f` (Cargo.toml, rust-toolchain.toml, .gitignore)
+2. **chrys-source crate** - `ccef85f` (feat + test, 3 tests)
+3. **chrys-source-raster adapter** - `92958cd` (feat + test, 3 tests)
+4. **chrys-core engine** - `89facb2` (feat + test, 6 tests)
+5. **chrys-cli binary** - `30ec646` (feat)
+6. **Golden pair and generator** - `977c093` (the fixture files)
+7. **cargo fmt cleanup** - `3c51e8a` (formatting only, no behaviour change)
 
 **Plan metadata:** commit pending (this SUMMARY, STATE.md, ROADMAP.md — orchestrator owns state writes per the objective given to this executor)
 
@@ -168,7 +168,7 @@ Landed as an ordered group of commits, per AGENTS.md (one change per commit, cod
 - **Fix:** Ran `cargo fmt` and committed the reformatted files as their own commit, with no behaviour change.
 - **Files modified:** the three files above
 - **Verification:** `cargo fmt --check` now reports no diff; `cargo test --workspace` still reports every test passing (12 tests total, 0 failed).
-- **Committed in:** `3f7d2f2`
+- **Committed in:** `3c51e8a`
 
 ---
 
@@ -196,7 +196,7 @@ All files below were verified present on disk (`ls -la`) and all commit hashes v
 - `crates/chrys-core/src/lib.rs`, `crates/chrys-core/src/verdict.rs`, `crates/chrys-core/Cargo.toml` — FOUND
 - `crates/chrys-cli/src/main.rs`, `crates/chrys-cli/Cargo.toml` — FOUND
 - `tests/golden/pair-01/base.png`, `tests/golden/pair-01/candidate.png` — FOUND
-- Commits `29ed804`, `35dc93c`, `c1c50ef`, `a48aab8`, `25e3d94`, `c2da725`, `3f7d2f2` — FOUND in `git log --oneline`
+- Commits `401e61f`, `ccef85f`, `92958cd`, `89facb2`, `30ec646`, `977c093`, `3c51e8a` — FOUND in `git log --oneline`
 
 ---
 *Phase: 01-raster-engine-and-determinism-proof*

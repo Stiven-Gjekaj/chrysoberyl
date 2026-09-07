@@ -23,7 +23,7 @@ actuals:
   tokens: 14869
   tasks: 2
   commits: 2
-plan_head_before: 1f08283aa35ace431f046ab31aab9c548d6b3376
+plan_head_before: 8e3db893c3179cf2781b7e3d49ffff7ff43b7bae
 
 # Tech tracking
 tech-stack:
@@ -180,8 +180,8 @@ status: complete
 
 ## Task Commits
 
-1. **Task 1: Warp the candidate and answer any rectangle sum in four lookups** - `4ba1667` (feat + test: `chrys-core/src/register/{warp,integral,mod}.rs`, `chrys-core/tests/block_match.rs`)
-2. **Task 2: Match blocks coarse to fine and produce the residual field** - `d502d62` (feat + test: `chrys-core/src/register/{block_match,mod}.rs`, `chrys-core/src/{residual,lib}.rs`, `chrys-core/tests/block_match.rs`)
+1. **Task 1: Warp the candidate and answer any rectangle sum in four lookups** - `aee0eb1` (feat + test: `chrys-core/src/register/{warp,integral,mod}.rs`, `chrys-core/tests/block_match.rs`)
+2. **Task 2: Match blocks coarse to fine and produce the residual field** - `084dfd7` (feat + test: `chrys-core/src/register/{block_match,mod}.rs`, `chrys-core/src/{residual,lib}.rs`, `chrys-core/tests/block_match.rs`)
 
 **Plan metadata:** commit pending (this SUMMARY — orchestrator owns STATE.md/ROADMAP.md writes per the objective given to this executor)
 
@@ -209,7 +209,7 @@ See `key-decisions` in the frontmatter. In short: both the search's per-candidat
 - **Fix:** Both call sites now warp by the negated `(dx, dy)`, with a doc comment at each explaining why, cross-referencing the global alignment step's own identical pattern.
 - **Files modified:** `crates/chrys-core/src/register/block_match.rs`
 - **Verification:** `block_match_reports_a_single_moved_blocks_own_offset` (a block whose content is built by copying a 32x32 patch shifted 4 pixels left into position, matching "content moved right by 4," now reports `dx: 4, dy: 0` exactly as the plan's own behaviour text specifies) passes; every other block in that test reports `(0, 0)`.
-- **Committed in:** `d502d62` (found and fixed before this task's own commit)
+- **Committed in:** `084dfd7` (found and fixed before this task's own commit)
 
 **2. [Rule 1 - Bug] A three-level pyramid's reach let an entirely flat, whole-block-sized region alias against an unrelated, identically-coloured region**
 - **Found during:** Task 2, first `cargo test --workspace` run after wiring `block_match` into `compare`
@@ -217,7 +217,7 @@ See `key-decisions` in the frontmatter. In short: both the search's per-candidat
 - **Fix:** Two changes, together: `PYRAMID_LEVELS` reduced to 2, bounding the hierarchy's reach at `(2^2 - 1) * 8 = 24`, comfortably below `BLOCK_SIDE`'s 32 (an escape needs the read window to clear the block's own full 32-pixel span on at least one axis, which a 24-pixel reach cannot do); and the pre-existing test fixture gained a protective moat, a 112x112 square in a colour (pure black) whose own deviation from the background exceeds the recolour's, painted around the 64x64 recoloured rectangle before the recolour itself is applied, wide enough to cover the search's own 24-pixel reach on every side. Reducing the pyramid alone was not sufficient on its own (any nonzero reach still provides some improvement from partially escaping into a flat, coincidentally-matching background), so both changes were necessary.
 - **Files modified:** `crates/chrys-core/src/register/block_match.rs` (constant and its doc comment), `crates/chrys-core/src/lib.rs` (test fixture only)
 - **Verification:** `cargo test -p chrys-core --lib tests::a_recoloured_rectangle_returns_one_recoloured_region` passes with the exact bounding box, base colour and candidate colour the test has always asserted; `cargo test --workspace` reports 111 tests passing, 0 failing.
-- **Committed in:** `d502d62`
+- **Committed in:** `084dfd7`
 
 **3. [Rule 3 - Blocking issue] `needless_range_loop` from clippy on a loop that indexes two different structures by the same pair**
 - **Found during:** Task 2, first `cargo clippy --workspace --all-targets -- -D warnings` run
@@ -225,7 +225,7 @@ See `key-decisions` in the frontmatter. In short: both the search's per-candidat
 - **Fix:** `#[allow(clippy::needless_range_loop)]` on the loop, since an iterator-based rewrite would need the same index values duplicated via `enumerate()` for no clarity gain.
 - **Files modified:** `crates/chrys-core/src/register/block_match.rs`
 - **Verification:** `cargo clippy --workspace --all-targets -- -D warnings` passes clean.
-- **Committed in:** `d502d62`
+- **Committed in:** `084dfd7`
 
 ---
 
@@ -252,7 +252,7 @@ None - no external service configuration required.
 All files below were verified present on disk and both commit hashes verified present in `git log --oneline` on this branch before this line was written:
 - `crates/chrys-core/src/register/warp.rs`, `integral.rs`, `block_match.rs` — FOUND
 - `crates/chrys-core/tests/block_match.rs` — FOUND
-- Commits `4ba1667`, `d502d62` — FOUND in `git log --oneline`
+- Commits `aee0eb1`, `084dfd7` — FOUND in `git log --oneline`
 
 ---
 *Phase: 01-raster-engine-and-determinism-proof*
