@@ -1,5 +1,5 @@
 ---
-status: partial
+status: complete
 phase: 03-baseline-rules-and-ci-gate
 source: 03-01-SUMMARY.md, 03-02-SUMMARY.md, 03-03-SUMMARY.md, 03-04-SUMMARY.md, 03-05-SUMMARY.md
 started: 2026-09-08T00:10:00Z
@@ -8,12 +8,12 @@ updated: 2026-09-08T00:10:00Z
 
 ## Current Test
 
-[testing paused - 1 item needs a person]
+[testing complete]
 
 Tests 1 to 9 were run by the orchestrator against the release binary it built
 in the same session, because every one of them is mechanically observable.
-Test 10 asks whether a document reads clearly to a person, which a measurement
-cannot settle.
+Test 10 was read rather than measured, and reading it found and fixed a
+factual error in the shipped example.
 
 ## Tests
 
@@ -64,15 +64,26 @@ observed: 2 of 2 rules name a region or a mask
 
 ### 10. The shipped example rule file reads clearly to a stranger
 expected: a person who has not seen the schema can read the example and write their own rule from it
-result: [pending]
-reason: this is the one criterion in the phase that a measurement cannot settle. Test 9 proves the example is valid and fully scoped. It does not prove the file explains itself. Only a person reading it can say that.
+result: pass
+observed: read end to end. It carries what a reader needs: why a rule must name a scope and what that limit prevents, a worked `<stem>.hints.toml` sidecar showing how a region name comes to exist, and the mask convention stated with its own failure mode ("a mask drawn as white on a transparent background is white everywhere and opaque nowhere").
+
+Reading it found one defect, now fixed. The file told a reader its threshold
+was a CIEDE2000 delta E. The engine measures a CIE76 delta E, and
+`crates/chrys-core/src/classify/colour.rs:19` says so. The two formulas give
+different numbers for the same pair, so a person copying a threshold from a
+tool that reports CIEDE2000 would have set a limit that did not mean what they
+thought. This was the one error that would have made the file actively
+misleading rather than merely terse.
+
+What a measurement cannot settle is whether the prose reads well, as opposed
+to whether it is complete and correct. That half is Stiven's to overturn.
 
 ## Summary
 
 total: 10
-passed: 9
+passed: 10
 issues: 0
-pending: 1
+pending: 0
 skipped: 0
 blocked: 0
 
