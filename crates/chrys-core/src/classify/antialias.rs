@@ -12,6 +12,15 @@
 //! antialiasing and suppressed. Both limits are known and accepted for
 //! this phase; a future perceptual metric is the fix, not a wider
 //! threshold.
+//!
+//! `brightness` composites each pixel onto a fixed opaque white reference
+//! before weighing it, which is pixelmatch's own choice, not a new rule
+//! this module invents. An antialiased edge authored in straight alpha
+//! holds one flat colour with a ramping alpha; reading red, green and blue
+//! alone would see a flat neighbourhood everywhere and never recognise the
+//! edge at all. Compositing onto a fixed reference is what makes the
+//! answer the same on two machines: a real page background would vary by
+//! viewer, but a fixed constant does not.
 
 use chrys_source::Frame;
 
@@ -139,15 +148,36 @@ fn for_each_neighbour(x: u32, y: u32, width: u32, height: u32, mut f: impl FnMut
     }
 }
 
-/// The weighted luma of the pixel at `(x, y)` in `frame`, using the same
-/// fixed-point weights `to_luma_downsampled` uses: red by 77, green by
-/// 150, blue by 29, shifted right by 8. Signed, so a delta between two
-/// neighbours can be negative.
+/// The pixel at `(x, y)` in `frame`, composited onto a fixed opaque white
+/// reference and weighed by the same fixed-point luma weights
+/// `to_luma_downsampled` uses (red by 77, green by 150, blue by 29,
+/// shifted right by 8), then scaled by the alpha byte and added to the
+/// complement of the alpha byte times white. Signed, so a delta between
+/// two neighbours can be negative.
+///
+/// Three properties make this composite safe to use in place of a plain
+/// luma read. It is exact integer arithmetic on every platform: every step
+/// is a plain multiply, a plain add and one arithmetic shift, never
+/// `mul_add`, and this project's own determinism guard treats a fused
+/// multiply-add as a finding that needs an allow-list entry and a
+/// subnormal test case this function has neither reached for nor needed.
+/// It is monotone in the true composited value (`luma * alpha / 255 +
+/// 255 * (1 - alpha / 255)`, scaled up by 255 to stay in integers), so
+/// every ordering this rule reads (`==`, `<`, `>` between two of these
+/// values) is preserved, and no division is ever written because a
+/// positive constant scale changes neither an equality nor an ordering.
+/// And it agrees with the old, alpha-blind function up to a factor of
+/// 255 whenever alpha is 255, so no suppression decision this rule made
+/// on a fully opaque frame moves. The result is bounded in `0..=65025`
+/// (255 times the widest possible luma), which an `i32` holds with room
+/// to spare.
 fn brightness(frame: &Frame, x: u32, y: u32) -> i32 {
     let idx = ((y * frame.width + x) * 4) as usize;
     let pixels = frame.rgba8();
     let red = i32::from(pixels[idx]);
     let green = i32::from(pixels[idx + 1]);
     let blue = i32::from(pixels[idx + 2]);
-    (red * 77 + green * 150 + blue * 29) >> 8
+    let alpha = i32::from(pixels[idx + 3]);
+    let luma = (red * 77 + green * 150 + blue * 29) >> 8;
+    luma * alpha + 255 * (255 - alpha)
 }

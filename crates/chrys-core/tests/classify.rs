@@ -307,6 +307,97 @@ fn suppress_antialiasing_keeps_a_real_recoloured_blocks_region() {
     );
 }
 
+/// Build a base/candidate pair whose red, green and blue bytes are one
+/// flat colour everywhere, and whose alpha channel carries the same
+/// diagonal antialiasing band `diagonal_edge_pair` builds in colour,
+/// shifted by one pixel between the two frames the way the same edge
+/// looks rendered at two different subpixel positions. Mirrors
+/// `diagonal_edge_pair`'s own margin and integer-coverage construction,
+/// over alpha instead of red, green and blue.
+fn diagonal_alpha_edge_pair(
+    size: u32,
+    margin: u32,
+    flat_colour: u8,
+    bg_alpha: u8,
+    mid_alpha_base: u8,
+    mid_alpha_candidate: u8,
+    fg_alpha: u8,
+) -> (Frame, Frame) {
+    let mut base_pixels = Vec::with_capacity((size * size * 4) as usize);
+    let mut candidate_pixels = Vec::with_capacity((size * size * 4) as usize);
+    for y in 0..size {
+        for x in 0..size {
+            let d = x as i32 - y as i32;
+            let base_alpha = match d.cmp(&0) {
+                std::cmp::Ordering::Less => bg_alpha,
+                std::cmp::Ordering::Equal => mid_alpha_base,
+                std::cmp::Ordering::Greater => fg_alpha,
+            };
+            let is_safe_interior =
+                x >= margin && x < size - margin && y >= margin && y < size - margin;
+            let candidate_alpha = if d == 0 && is_safe_interior {
+                mid_alpha_candidate
+            } else {
+                base_alpha
+            };
+            base_pixels.extend_from_slice(&[flat_colour, flat_colour, flat_colour, base_alpha]);
+            candidate_pixels.extend_from_slice(&[
+                flat_colour,
+                flat_colour,
+                flat_colour,
+                candidate_alpha,
+            ]);
+        }
+    }
+    (
+        frame_from(size, size, base_pixels),
+        frame_from(size, size, candidate_pixels),
+    )
+}
+
+#[test]
+fn suppress_antialiasing_on_an_alpha_expressed_diagonal_edge_yields_no_region() {
+    let (base, candidate) = diagonal_alpha_edge_pair(20, 5, 120, 30, 90, 190, 220);
+    let mut field = residual_from_raw_diff(&base, &candidate);
+
+    // Sanity: before suppression, the diagonal band is a real difference.
+    assert!(!label_regions(&field).is_empty());
+
+    suppress_antialiasing(&mut field, &base, &candidate);
+    assert!(label_regions(&field).is_empty());
+}
+
+#[test]
+fn suppress_antialiasing_keeps_a_solid_alpha_only_change() {
+    // A solid rectangle whose alpha flips from 255 to 0, with no ramp: the
+    // guard that stops a later widening of `is_antialiasing` from
+    // swallowing gap G-01-1's own case.
+    let base = solid_frame(20, 20, 30);
+    let mut candidate_pixels = base.pixels.clone();
+    for row in 5..11u32 {
+        for col in 5..11u32 {
+            let idx = ((row * 20 + col) * 4) as usize;
+            candidate_pixels[idx + 3] = 0;
+        }
+    }
+    let candidate = frame_from(20, 20, candidate_pixels);
+
+    let mut field = residual_from_raw_diff(&base, &candidate);
+    suppress_antialiasing(&mut field, &base, &candidate);
+
+    let regions = label_regions(&field);
+    assert_eq!(regions.len(), 1);
+    assert_eq!(
+        regions[0].bbox,
+        BoundingBox {
+            x: 5,
+            y: 5,
+            width: 6,
+            height: 6,
+        }
+    );
+}
+
 fn solid_colour_frame(width: u32, height: u32, colour: [u8; 4]) -> Frame {
     let mut pixels = Vec::with_capacity((width * height * 4) as usize);
     for _ in 0..(width * height) {
