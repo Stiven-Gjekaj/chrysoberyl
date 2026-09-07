@@ -88,7 +88,7 @@ jobs:
           echo "== tests/golden/formats/webp-anim ==" >> digest.txt
           cargo run -q --release -p chrys-cli -- compare tests/golden/formats/webp-anim/base.webp tests/golden/formats/webp-anim/candidate.webp --hash-only >> digest.txt
 
-          echo "== tests/golden/alpha-01 ==" >> digest.txt
+          echo "== alpha-01 (gap G-01-1) ==" >> digest.txt
           cargo run -q --release -p chrys-cli -- compare tests/golden/alpha-01/base.png tests/golden/alpha-01/candidate.png --hash-only >> digest.txt
 
       - name: Upload the digest report
