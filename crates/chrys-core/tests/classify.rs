@@ -441,7 +441,15 @@ const KIND_FG: [u8; 4] = [200, 50, 50, 255];
 
 /// Set the fourth byte of every pixel inside `x, y, width, height` to
 /// `alpha`, leaving every other byte untouched.
-fn set_rect_alpha(pixels: &mut [u8], stride: u32, x: u32, y: u32, width: u32, height: u32, alpha: u8) {
+fn set_rect_alpha(
+    pixels: &mut [u8],
+    stride: u32,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+    alpha: u8,
+) {
     for row in y..y + height {
         for col in x..x + width {
             let idx = ((row * stride + col) * 4) as usize;
