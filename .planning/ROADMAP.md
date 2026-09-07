@@ -168,7 +168,7 @@ range after proving the measurement can fail.
   3. A baseline hash manifest is committed to the repository. Committed golden files are the default store, reached through a trait, so a second backend needs no change to the engine.
   4. The CLI compares two paths, prints the verdict, exits non-zero on a rule failure, and writes a report artifact that names each change by kind, region, and size.
   5. A person accepts a new baseline explicitly through the CLI. Nothing updates a baseline on its own, and every decode call sets an explicit memory limit.
-  6. A sequence of a hundred frames reports only the frames that changed, and closes with a count of the frames that did not. The per-frame detail stays available behind a flag. The printed frame number agrees with the name of the file it describes. This closes G-02-12, which phase 2 acceptance test 12 failed on 2026-09-07: that shape printed 200 lines for 100 frames, of which 5 carried a verdict.
+  6. The report names the file a frame came from, not only its index. Phase 2 printed a zero-based index beside files named from one, and no fixed offset fixes that, because the producer names the files.
 
 **Plans**: TBD
 

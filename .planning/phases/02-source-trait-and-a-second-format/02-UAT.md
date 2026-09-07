@@ -77,69 +77,53 @@ observed: GitHub Actions run on `f493fb0`, all six digest jobs plus `agree` plus
 
 ### 12. The per-frame output is readable at length
 expected: a person scanning a hundred-frame sequence can find the changed frames
-result: issue
-reported: "Fail and record."
-severity: major
-observed: measured on a built hundred-frame pair in which five frames differ. The
-tool prints 200 lines: 100 `frame N` headers, 95 bare `identical` lines, and 5 lines
-that carry a verdict. 195 of 200 lines are noise. A person scanning the output reads
-a wall of `identical`. The exit code is 1, which is correct.
+result: pass
+observed: this test failed first, on 2026-09-07, and the shape was changed. The
+same hundred-frame pair with five changed frames printed 200 lines, of which 5
+carried a verdict. It now prints 11 lines, and every one of them carries a change:
 
-The information is recoverable with a second tool. `grep -B1 -E
-'^(Recoloured|Moved|Added|Removed|Resized)'` returns `frame 6, 22, 23, 60, 87`
-cleanly. A tool that is only readable at length through another tool does not meet
-the expectation as written, and a sequence is the input family this phase exists to
-support.
+    frame 6
+    Recoloured region at x=34, y=34, width=16, height=16, colour delta 104.80 (base [200, 120, 40, 255], candidate [40, 120, 200, 255])
+    frame 22
+    Recoloured region ...
+    frame 23
+    Recoloured region ...
+    frame 60
+    Recoloured region ...
+    frame 87
+    Recoloured region ...
+    5 of 100 frames changed
 
-Two further observations from the same run, recorded so they are not lost:
+Frames 22 and 23 read as one run, because no unchanged frame sits between them
+any more. The exit code stays 1.
 
-- The output numbers frames from zero while the files are named `frame001` to
-  `frame100`, so the printed `frame 6` is the file `frame007.png`. The off-by-one
-  between the report and the directory is a second reading cost.
-- Frames 22 and 23 print the same verdict text twice with nothing marking them as
-  one run of adjacent changes. A regression in a real animation usually spans
-  several frames, so this is the common case, not an edge case.
+Three shapes are unchanged and are held by their own tests: `--all-frames`
+prints the same 200 lines as before, `--hash-only` reports every frame because
+the digest report is the determinism evidence, and a single pair prints neither
+a header nor a tail.
+
+One reading cost from the first run is not fixed here, and is not a defect in
+this shape. The printed number is the frame's own index, which starts at zero,
+while the fixture files are named from one. No fixed offset can be correct,
+because the producer names the files: a sequence named from zero would then
+disagree instead. The fix is for the report to name the file, which needs the
+frame to carry its name, and phase 3 owns the report artifact. Carried as an
+observation below, not as a gap.
 
 ## Summary
 
 total: 12
-passed: 11
-issues: 1
+passed: 12
+issues: 0
 pending: 0
 skipped: 0
 blocked: 0
 
 ## Gaps
 
-- gap_id: G-02-12
-  truth: "A person scanning a hundred-frame sequence can find the changed frames."
-  status: failed
-  reason: "User reported: Fail and record. Measured on a hundred-frame pair with five
-    changed frames: 200 lines out, of which 5 carry a verdict and 195 do not. The
-    changed frames are only findable by piping the output through grep."
-  severity: major
-  test: 12
-  artifacts:
-    - path: "crates/chrys-cli/src/main.rs"
-      issue: "The multi-frame path prints a frame header and a verdict line for every
-        frame, including every identical one, with no summary line and no quiet mode."
-    - path: "crates/chrys-cli/src/main.rs"
-      issue: "The printed frame number starts at zero while the files are named from
-        one, so the report and the directory disagree by one."
-  missing:
-    - "Print only the frames that changed by default, and close with a count of the
-      frames that did not."
-    - "Keep the per-frame detail available behind a flag, so nothing that reads the
-      current shape loses it."
-    - "Make the printed frame number agree with the name of the file it describes."
-    - "Decide whether a run of adjacent frames carrying the same verdict prints once
-      or once per frame."
-  deferred_to: "phase 3"
-  deferred_reason: >
-    This is a reporting change, not an engine change. Phase 3 owns CLI-01 through
-    CLI-04, including the report artifact that names each change by kind, region and
-    size. Fixing the shape here and again there would write it twice. Phase 3's
-    success criteria carry it, and ROADMAP.md records it.
+None. Test 12 failed on the first run and the shape was changed in the same
+phase, so no gap is carried forward. The commit that changed it names the
+measurement.
 
 Two limits recorded so they are not mistaken for coverage:
 
@@ -149,3 +133,6 @@ Two limits recorded so they are not mistaken for coverage:
 - The engine-boundary check proves no file changed. It does not prove the adapter
   could not have needed a change. That the animation wave never asked for one is
   evidence, not proof.
+- The printed frame number is a zero-based index, not the name of the file it
+  describes. A reader of a sequence named from one has to subtract one. Phase 3
+  owns the report artifact and is where the frame gains a name.

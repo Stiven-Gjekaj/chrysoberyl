@@ -84,7 +84,7 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 | Category | Item | Status | Deferred At | Milestone |
 |----------|------|--------|-------------|-----------|
-| Acceptance test | G-02-12: a hundred-frame sequence prints 200 lines, of which 5 carry a verdict. Phase 2 acceptance test 12 failed. The fix is a reporting change and phase 3 owns the CLI report, so it is carried there as success criterion 6. | Open, carried to phase 3 | 2026-09-07 | v0.1 |
+| *(none)* | | | | |
 
 ## Session Continuity
 
