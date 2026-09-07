@@ -51,7 +51,7 @@ reassigns as follows, and lands at eight phases, inside the 5-to-8 range for
 
 - [x] **Phase 1: Raster engine and determinism proof** - Compare raster images and prove the verdict is identical across OS and CPU architecture. (completed 2026-09-07)
 - [x] **Phase 2: Source trait and a second format** - Add animation and frame-sequence input without a change to the comparison engine. (completed 2026-09-07)
-- [ ] **Phase 3: Baseline, rules and CI gate** - Commit a baseline, scope tolerance by rule, and gate CI on the verdict.
+- [x] **Phase 3: Baseline, rules and CI gate** - Commit a baseline, scope tolerance by rule, and gate CI on the verdict. (completed 2026-09-08)
 - [ ] **Phase 4: SVG rasterization** - Rasterize vector input on the CPU and prove the font and curve output is deterministic.
 - [ ] **Phase 5: PDF page comparison** - Compare PDF pages behind a feature flag, and prove or withdraw the determinism claim.
 - [ ] **Phase 6: wgpu mirror and native window** - Show a pair in a native window with GPU-accelerated pan and zoom, with the GPU never deciding a verdict.
@@ -280,7 +280,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 |-------|----------------|--------|-----------|
 | 1. Raster engine and determinism proof | 9/9 | Complete    | 2026-09-07 |
 | 2. Source trait and a second format | 5/5 | Complete    | 2026-09-07 |
-| 3. Baseline, rules and CI gate | 4/4 | Executed    | - |
+| 3. Baseline, rules and CI gate | 5/5 | Complete    | 2026-09-08 |
 | 4. SVG rasterization | 0/TBD | Not started | - |
 | 5. PDF page comparison | 0/TBD | Not started | - |
 | 6. wgpu mirror and native window | 0/TBD | Not started | - |

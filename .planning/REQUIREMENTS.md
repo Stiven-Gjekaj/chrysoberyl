@@ -61,29 +61,29 @@ release. See ROADMAP.md for the order.
 
 ### Rules and Tolerance
 
-- [ ] **RULE-01**: A TOML rule file sets tolerance by kind of change
-- [ ] **RULE-02**: A rule is scoped to a named region or to a mask
-- [ ] **RULE-03**: A rule file is read as data. No rule is computed or executed
-- [ ] **RULE-04**: The shipped example rule file shows a scoped exclusion, and
+- [x] **RULE-01**: A TOML rule file sets tolerance by kind of change
+- [x] **RULE-02**: A rule is scoped to a named region or to a mask
+- [x] **RULE-03**: A rule file is read as data. No rule is computed or executed
+- [x] **RULE-04**: The shipped example rule file shows a scoped exclusion, and
       never a bare global threshold
-- [ ] **RULE-05**: An unknown key or a malformed rule fails loudly and names
+- [x] **RULE-05**: An unknown key or a malformed rule fails loudly and names
       the line
 
 ### Baseline
 
-- [ ] **BASE-01**: A baseline hash manifest is committed to the repository
-- [ ] **BASE-02**: Committed golden files are the default store backend
-- [ ] **BASE-03**: The store is a trait, so a second backend is added without a
+- [x] **BASE-01**: A baseline hash manifest is committed to the repository
+- [x] **BASE-02**: Committed golden files are the default store backend
+- [x] **BASE-03**: The store is a trait, so a second backend is added without a
       change to the engine
-- [ ] **BASE-04**: A person accepts a new baseline explicitly. Nothing updates
+- [x] **BASE-04**: A person accepts a new baseline explicitly. Nothing updates
       a baseline on its own
 
 ### Command Line and CI
 
-- [ ] **CLI-01**: The tool exits non-zero when a rule fails
+- [x] **CLI-01**: The tool exits non-zero when a rule fails
 - [ ] **CLI-02**: The tool writes a report artifact that names each change by
       kind, region and size
-- [ ] **CLI-03**: The tool compares two paths given on the command line and
+- [x] **CLI-03**: The tool compares two paths given on the command line and
       prints the verdict
 - [ ] **CLI-04**: Every decode call sets an explicit memory limit, so a
       malformed input fails instead of exhausting memory
@@ -151,18 +151,18 @@ release. See ROADMAP.md for the order.
 | SRC-03 | Phase 2 | Complete |
 | SRC-08 | Phase 2 | Complete |
 | SRC-09 | Phase 2 | Complete |
-| RULE-01 | Phase 3 | Pending |
-| RULE-02 | Phase 3 | Pending |
-| RULE-03 | Phase 3 | Pending |
-| RULE-04 | Phase 3 | Pending |
-| RULE-05 | Phase 3 | Pending |
-| BASE-01 | Phase 3 | Pending |
-| BASE-02 | Phase 3 | Pending |
-| BASE-03 | Phase 3 | Pending |
-| BASE-04 | Phase 3 | Pending |
-| CLI-01 | Phase 3 | Pending |
+| RULE-01 | Phase 3 | Complete |
+| RULE-02 | Phase 3 | Complete |
+| RULE-03 | Phase 3 | Complete |
+| RULE-04 | Phase 3 | Complete |
+| RULE-05 | Phase 3 | Complete |
+| BASE-01 | Phase 3 | Complete |
+| BASE-02 | Phase 3 | Complete |
+| BASE-03 | Phase 3 | Complete |
+| BASE-04 | Phase 3 | Complete |
+| CLI-01 | Phase 3 | Complete |
 | CLI-02 | Phase 3 | Complete |
-| CLI-03 | Phase 3 | Pending |
+| CLI-03 | Phase 3 | Complete |
 | CLI-04 | Phase 3 | Complete |
 | SRC-04 | Phase 4 | Pending |
 | DET-05 | Phase 4 | Pending |
