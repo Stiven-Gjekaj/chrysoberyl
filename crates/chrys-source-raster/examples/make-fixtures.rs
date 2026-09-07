@@ -69,6 +69,7 @@ fn main() {
     write_refusal_corpus();
     write_sequence_01();
     write_hint_01();
+    write_alpha_01();
 }
 
 /// Write the first committed pair, read by plan 01-03. Its bytes must not
@@ -476,6 +477,50 @@ fn write_hint_01() {
     println!("wrote {}", candidate_path.display());
     println!("wrote {}", base_sidecar_path.display());
     println!("wrote {}", candidate_sidecar_path.display());
+}
+
+/// The rectangle inside `alpha-01`'s candidate whose alpha byte is set to
+/// zero, leaving its red, green and blue bytes untouched: `(x, y, width,
+/// height)`. The rectangle sits wholly inside the first `STRUCTURED_RECTS`
+/// rectangle, which spans x 40 to 90 and y 40 to 80, so real content
+/// becomes transparent rather than empty background; and it keeps a
+/// margin of at least eight pixels from that rectangle's own edges, so the
+/// antialiasing rule's eight-neighbour test never reaches an unrelated
+/// edge.
+const ALPHA_HOLE: (u32, u32, u32, u32) = (48, 48, 24, 20);
+
+/// Write the committed `alpha-01` fixture: gap G-01-1, a pair whose colour
+/// bytes are identical and whose alpha bytes are not.
+///
+/// The base side is `build_structured_canvas(0, 0)`, the same near-identical
+/// content the `should-register` corpus already measures a peak confidence
+/// for, well above `REFUSAL_THRESHOLD`. The candidate clones the base and
+/// sets the alpha byte to zero inside `ALPHA_HOLE`, leaving every red, green
+/// and blue byte exactly as it is.
+fn write_alpha_01() {
+    let base = build_structured_canvas(0, 0);
+    let mut candidate = base.clone();
+    let (hole_x, hole_y, hole_width, hole_height) = ALPHA_HOLE;
+    for yy in hole_y..hole_y + hole_height {
+        for xx in hole_x..hole_x + hole_width {
+            candidate.get_pixel_mut(xx, yy).0[3] = 0;
+        }
+    }
+
+    let out_dir = golden_root().join("alpha-01");
+    std::fs::create_dir_all(&out_dir)
+        .unwrap_or_else(|e| panic!("create {}: {e}", out_dir.display()));
+
+    let base_path = out_dir.join("base.png");
+    let candidate_path = out_dir.join("candidate.png");
+    base.save(&base_path)
+        .unwrap_or_else(|e| panic!("write {}: {e}", base_path.display()));
+    candidate
+        .save(&candidate_path)
+        .unwrap_or_else(|e| panic!("write {}: {e}", candidate_path.display()));
+
+    println!("wrote {}", base_path.display());
+    println!("wrote {}", candidate_path.display());
 }
 
 fn golden_root() -> std::path::PathBuf {
