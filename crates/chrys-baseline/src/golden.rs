@@ -11,11 +11,17 @@
 //!
 //! **Every write lives in one function.** `write_baseline`, below, is the
 //! only place in this crate that creates a directory, copies a file, writes
-//! a file, or removes one. `accept` calls it and nothing else does. This is
-//! what BASE-04 rests on: a second, unnamed way to write into the store
-//! would be a second, unreviewed path to the same drift an explicit accept
-//! exists to prevent. `crates/chrys-baseline/tests/store.rs` holds a static
-//! guard that checks this claim over this file's own source text.
+//! a file, removes one, or renames one. `accept` calls it and nothing else
+//! does. This is what BASE-04 rests on: a second, unnamed way to write into
+//! the store would be a second, unreviewed path to the same drift an
+//! explicit accept exists to prevent. `crates/chrys-baseline/tests/store.rs`
+//! holds a static guard that checks this claim over this file's own source
+//! text.
+//!
+//! **The write is staged, not destructive.** `write_baseline` builds the
+//! new baseline and the new manifest beside the old ones, complete, before
+//! it touches either. See `write_baseline`'s own doc comment for the full
+//! contract and the one window it does not close.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -257,12 +263,46 @@ impl BaselineStore for GoldenFileStore {
 }
 
 /// The one function in this crate that creates a directory, copies a file,
-/// writes a file, or removes one. `accept` is the only caller.
+/// writes a file, removes one, or renames one. `accept` is the only
+/// caller.
 ///
-/// A prior acceptance under `name`, if any, is removed in full before the
-/// new one is written, so a baseline whose frame count shrinks between two
-/// accepts cannot leave a stale file behind that neither the manifest nor
-/// `resolve`'s own directory listing would then agree about.
+/// **Nothing a reader or a later accept can see is touched until the new
+/// state is complete on disk.** The new baseline is built in a staging
+/// directory beside the real one, and the new manifest is built in a
+/// temporary file beside the real one; only once both are complete does
+/// this function rename the staging directory into place, rename the
+/// temporary manifest over `MANIFEST.toml`, and remove what the rename
+/// displaced. A failure in any step before that point leaves the
+/// previous, complete baseline and the previous, complete manifest
+/// exactly as they were: nothing is deleted before the replacement exists
+/// (BASE-04, T-03-30). The previous approach, `fs::remove_dir_all` on the
+/// live baseline directory before writing the new one, is the one this
+/// replaces: a failure between those two points used to leave the store
+/// holding neither the old baseline nor the new one.
+///
+/// **The window this does not close.** Two renames are not one atomic
+/// act. Between the first (the new baseline directory swapped into
+/// place) and the second (the new manifest swapped into place), the
+/// baseline directory and `MANIFEST.toml` briefly disagree: the directory
+/// already holds the new candidate's bytes, and the manifest still
+/// records the previous candidate's digests. This function does not
+/// claim that gap is atomic, because it is not. It is safe because
+/// `verify_baseline_digests` (the CLI's own caller of
+/// `manifest_digests`) fails every later `compare --baseline` loudly,
+/// naming the baseline, the frame, and both digests, for as long as the
+/// two disagree (T-03-21): the residual window fails closed rather than
+/// silently.
+///
+/// **Why a stale staging directory is cleared but a stale temporary
+/// manifest is not.** A staging directory left behind by an earlier
+/// crashed accept holds files from a candidate nobody accepted; reusing
+/// it without clearing it first would copy those leftover files into the
+/// baseline this accept is building, alongside the current candidate's
+/// own files. `fs::write`, by contrast, truncates a file that already
+/// exists, so a stale temporary manifest is fully overwritten by this
+/// accept's own write and contributes nothing. A stale directory can
+/// contribute a file; a stale file cannot contribute a byte. That
+/// asymmetry is why only the directory is cleared before use.
 fn write_baseline(
     root: &Path,
     name: &str,
@@ -270,92 +310,145 @@ fn write_baseline(
     frame_digests: &[(String, String)],
 ) -> Result<(), BaselineError> {
     let baseline_dir = root.join(name);
+    let staging_dir = root.join(format!(".{name}.accept-tmp"));
+    let previous_dir = root.join(format!(".{name}.previous-tmp"));
+    let manifest_path = root.join("MANIFEST.toml");
+    let manifest_tmp_path = root.join("MANIFEST.toml.tmp");
 
-    if baseline_dir.is_dir() {
-        fs::remove_dir_all(&baseline_dir).map_err(|source| BaselineError::Io {
-            path: baseline_dir.clone(),
-            source,
-        })?;
-    }
-    fs::create_dir_all(&baseline_dir).map_err(|source| BaselineError::Io {
-        path: baseline_dir.clone(),
-        source,
-    })?;
-
-    if candidate_path.is_dir() {
-        // A directory candidate copies every regular file it directly
-        // holds, under the same name, byte for byte. This does not
-        // recurse into a nested directory and does not copy anything that
-        // is not a regular file, matching the rule
-        // `chrys_source_sequence::sequence::list_sorted` already applies
-        // for the same reason.
-        let entries = fs::read_dir(candidate_path).map_err(|source| BaselineError::Io {
-            path: candidate_path.to_path_buf(),
-            source,
-        })?;
-        for entry in entries {
-            let entry = entry.map_err(|source| BaselineError::Io {
-                path: candidate_path.to_path_buf(),
-                source,
-            })?;
-            let metadata = entry.metadata().map_err(|source| BaselineError::Io {
-                path: candidate_path.to_path_buf(),
-                source,
-            })?;
-            if !metadata.is_file() {
-                continue;
-            }
-            let destination = baseline_dir.join(entry.file_name());
-            fs::copy(entry.path(), &destination).map_err(|source| BaselineError::Io {
-                path: entry.path(),
+    // The whole staged write, as one closure, so a failure at any point
+    // below can be caught once, in one place, without repeating the same
+    // cleanup after every `?`.
+    let stage_and_swap = || -> Result<(), BaselineError> {
+        // A stale staging directory, left by an earlier crashed accept,
+        // holds files from a candidate nobody accepted: cleared before
+        // use, so it cannot contribute one of them to the baseline this
+        // accept builds.
+        if staging_dir.is_dir() {
+            fs::remove_dir_all(&staging_dir).map_err(|source| BaselineError::Io {
+                path: staging_dir.clone(),
                 source,
             })?;
         }
-    } else {
-        let file_name = candidate_path
-            .file_name()
-            .ok_or_else(|| BaselineError::Io {
-                path: candidate_path.to_path_buf(),
-                source: std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "the candidate path has no file name",
-                ),
-            })?;
-        let destination = baseline_dir.join(file_name);
-        fs::copy(candidate_path, &destination).map_err(|source| BaselineError::Io {
-            path: candidate_path.to_path_buf(),
+        fs::create_dir_all(&staging_dir).map_err(|source| BaselineError::Io {
+            path: staging_dir.clone(),
             source,
         })?;
-    }
 
-    let manifest_path = root.join("MANIFEST.toml");
-    let mut manifest = read_manifest(&manifest_path)?;
-    manifest.baseline.retain(|entry| entry.name != name);
-    manifest.baseline.push(BaselineEntry {
-        name: name.to_string(),
-        frame: frame_digests
-            .iter()
-            .map(|(source, digest)| FrameEntry {
-                source: source.clone(),
-                digest: digest.clone(),
-            })
-            .collect(),
-    });
-    // Sorted by name, so accepting a second, unrelated baseline never
-    // reorders an already-committed one in the diff: BASE-01 wants a
-    // single accepted change to read as one changed digest line, not as a
-    // reshuffled file.
-    manifest.baseline.sort_by(|a, b| a.name.cmp(&b.name));
+        if candidate_path.is_dir() {
+            // A directory candidate copies every regular file it
+            // directly holds, under the same name, byte for byte. This
+            // does not recurse into a nested directory and does not copy
+            // anything that is not a regular file, matching the rule
+            // `chrys_source_sequence::sequence::list_sorted` already
+            // applies for the same reason.
+            let entries = fs::read_dir(candidate_path).map_err(|source| BaselineError::Io {
+                path: candidate_path.to_path_buf(),
+                source,
+            })?;
+            for entry in entries {
+                let entry = entry.map_err(|source| BaselineError::Io {
+                    path: candidate_path.to_path_buf(),
+                    source,
+                })?;
+                let metadata = entry.metadata().map_err(|source| BaselineError::Io {
+                    path: candidate_path.to_path_buf(),
+                    source,
+                })?;
+                if !metadata.is_file() {
+                    continue;
+                }
+                let destination = staging_dir.join(entry.file_name());
+                fs::copy(entry.path(), &destination).map_err(|source| BaselineError::Io {
+                    path: entry.path(),
+                    source,
+                })?;
+            }
+        } else {
+            let file_name = candidate_path
+                .file_name()
+                .ok_or_else(|| BaselineError::Io {
+                    path: candidate_path.to_path_buf(),
+                    source: std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "the candidate path has no file name",
+                    ),
+                })?;
+            let destination = staging_dir.join(file_name);
+            fs::copy(candidate_path, &destination).map_err(|source| BaselineError::Io {
+                path: candidate_path.to_path_buf(),
+                source,
+            })?;
+        }
 
-    let serialized =
-        toml::to_string_pretty(&manifest).map_err(|error| BaselineError::MalformedManifest {
-            path: manifest_path.clone(),
-            message: error.to_string(),
+        let mut manifest = read_manifest(&manifest_path)?;
+        manifest.baseline.retain(|entry| entry.name != name);
+        manifest.baseline.push(BaselineEntry {
+            name: name.to_string(),
+            frame: frame_digests
+                .iter()
+                .map(|(source, digest)| FrameEntry {
+                    source: source.clone(),
+                    digest: digest.clone(),
+                })
+                .collect(),
+        });
+        // Sorted by name, so accepting a second, unrelated baseline never
+        // reorders an already-committed one in the diff: BASE-01 wants a
+        // single accepted change to read as one changed digest line, not
+        // as a reshuffled file.
+        manifest.baseline.sort_by(|a, b| a.name.cmp(&b.name));
+
+        let serialized = toml::to_string_pretty(&manifest).map_err(|error| {
+            BaselineError::MalformedManifest {
+                path: manifest_path.clone(),
+                message: error.to_string(),
+            }
         })?;
-    fs::write(&manifest_path, serialized).map_err(|source| BaselineError::Io {
-        path: manifest_path.clone(),
-        source,
-    })?;
+        // `fs::write` truncates a file that already exists, so a stale
+        // temporary manifest from an earlier crashed accept is fully
+        // overwritten here and contributes nothing: see this asymmetry
+        // explained in this function's own doc comment.
+        fs::write(&manifest_tmp_path, serialized).map_err(|source| BaselineError::Io {
+            path: manifest_tmp_path.clone(),
+            source,
+        })?;
 
-    Ok(())
+        // Only now does this function touch what a reader sees. The old
+        // baseline directory, if one exists, is renamed aside rather than
+        // deleted, so it survives until both of the following renames
+        // succeed.
+        let had_previous = baseline_dir.is_dir();
+        if had_previous {
+            fs::rename(&baseline_dir, &previous_dir).map_err(|source| BaselineError::Io {
+                path: baseline_dir.clone(),
+                source,
+            })?;
+        }
+        fs::rename(&staging_dir, &baseline_dir).map_err(|source| BaselineError::Io {
+            path: staging_dir.clone(),
+            source,
+        })?;
+        fs::rename(&manifest_tmp_path, &manifest_path).map_err(|source| BaselineError::Io {
+            path: manifest_tmp_path.clone(),
+            source,
+        })?;
+        if had_previous {
+            // Removed only after both renames above have already
+            // succeeded: by this point the new baseline and the new
+            // manifest are both in place, so the directory moved aside is
+            // no longer needed by anything this accept can still fail at.
+            let _ = fs::remove_dir_all(&previous_dir);
+        }
+
+        Ok(())
+    };
+
+    let result = stage_and_swap();
+    if result.is_err() {
+        // Best effort: a cleanup failure must not replace the error that
+        // caused it. A person needs to read why the accept failed, not
+        // why the tidying failed.
+        let _ = fs::remove_dir_all(&staging_dir);
+    }
+    result
 }

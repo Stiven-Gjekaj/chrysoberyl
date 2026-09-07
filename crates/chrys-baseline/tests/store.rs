@@ -259,6 +259,134 @@ fn resolve_writes_nothing_to_the_store() {
     );
 }
 
+/// Read every file directly under `dir` (no recursion, matching
+/// `write_baseline`'s own directory-candidate rule), as `(name, bytes)`
+/// pairs, sorted by name. Bytes, not lengths and not a count: `AGENTS.md`
+/// already records that a size is not a state.
+fn read_all_files(dir: &Path) -> Vec<(String, Vec<u8>)> {
+    let mut files: Vec<(String, Vec<u8>)> = fs::read_dir(dir)
+        .unwrap_or_else(|error| panic!("cannot read {}: {error}", dir.display()))
+        .map(|entry| entry.expect("read a directory entry"))
+        .filter(|entry| entry.metadata().expect("read metadata").is_file())
+        .map(|entry| {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let bytes = fs::read(entry.path()).expect("read a stored file's bytes");
+            (name, bytes)
+        })
+        .collect();
+    files.sort_by(|a, b| a.0.cmp(&b.0));
+    files
+}
+
+/// BASE-04, T-03-30: a failed accept destroys nothing. This interrupts a
+/// real `write_baseline` call after every candidate file is already
+/// staged, by making the manifest's own temporary path a directory
+/// instead of a file, which fails `fs::write` on every platform this
+/// project's own CI matrix runs, with no permission change required.
+#[test]
+fn a_failed_accept_leaves_the_previous_baseline_intact() {
+    let store_dir = TempStore::new("failed-accept-leaves-previous-intact");
+    let store = GoldenFileStore::new(&store_dir.root);
+
+    let first_candidate = write_candidate_file(
+        "failed-accept-leaves-previous-intact-first",
+        "base.png",
+        b"the-first-accepted-bytes",
+    );
+    store
+        .accept(
+            "pair-01",
+            &first_candidate,
+            &[("base.png".to_string(), "first-digest".to_string())],
+        )
+        .expect("the first accept succeeds");
+
+    let baseline_dir = store_dir.root.join("pair-01");
+    let manifest_path = store_dir.root.join("MANIFEST.toml");
+    let files_before = read_all_files(&baseline_dir);
+    let manifest_before = fs::read(&manifest_path).expect("read the manifest before the drill");
+
+    // A directory at the manifest's own temporary path makes fs::write
+    // fail at exactly the point CR-02 names: after every candidate file
+    // is already copied into the staging directory, but before either
+    // rename that touches what a reader sees.
+    let manifest_tmp_path = store_dir.root.join("MANIFEST.toml.tmp");
+    fs::create_dir_all(&manifest_tmp_path).expect("plant a directory at the tmp manifest path");
+
+    let second_candidate = write_candidate_file(
+        "failed-accept-leaves-previous-intact-second",
+        "base.png",
+        b"a-different-second-candidate-bytes",
+    );
+    let error = store
+        .accept(
+            "pair-01",
+            &second_candidate,
+            &[("base.png".to_string(), "second-digest".to_string())],
+        )
+        .expect_err("a manifest write that fails must fail the whole accept");
+    drop(error);
+
+    let files_after = read_all_files(&baseline_dir);
+    let manifest_after = fs::read(&manifest_path).expect("read the manifest after the drill");
+    assert_eq!(
+        files_before, files_after,
+        "a failed accept changed the previously accepted baseline's own bytes"
+    );
+    assert_eq!(
+        manifest_before, manifest_after,
+        "a failed accept changed MANIFEST.toml's own bytes"
+    );
+
+    let resolved = store
+        .resolve("pair-01")
+        .expect("resolve still finds the previous baseline after the failed accept");
+    let resolved_bytes = fs::read(&resolved).expect("read the resolved file's bytes");
+    assert_eq!(
+        resolved_bytes, b"the-first-accepted-bytes",
+        "resolve should still return the first candidate's own bytes, not the second's"
+    );
+}
+
+/// T-03-31: a staging directory left behind by an earlier crashed accept
+/// holds a file from a candidate nobody accepted; it must contribute
+/// nothing to the next accepted baseline.
+#[test]
+fn a_stale_staging_directory_contributes_no_file_to_the_next_accept() {
+    let store_dir = TempStore::new("stale-staging-contributes-nothing");
+    let store = GoldenFileStore::new(&store_dir.root);
+
+    let staging_dir = store_dir.root.join(".pair-01.accept-tmp");
+    fs::create_dir_all(&staging_dir).expect("plant a stale staging directory");
+    fs::write(
+        staging_dir.join("leftover-from-a-crash.png"),
+        b"nobody accepted this",
+    )
+    .expect("plant a stale file inside the staging directory");
+
+    let candidate = write_candidate_file(
+        "stale-staging-contributes-nothing",
+        "base.png",
+        b"the-only-file-this-accept-should-store",
+    );
+    store
+        .accept(
+            "pair-01",
+            &candidate,
+            &[("base.png".to_string(), "deadbeef".to_string())],
+        )
+        .expect("accept succeeds");
+
+    let baseline_dir = store_dir.root.join("pair-01");
+    let stored_files = read_all_files(&baseline_dir);
+    let stored_names: Vec<&str> = stored_files.iter().map(|(name, _)| name.as_str()).collect();
+    assert_eq!(
+        stored_names,
+        vec!["base.png"],
+        "the accepted baseline should hold only base.png, not the stale staged file: {stored_names:?}"
+    );
+}
+
 /// A smaller copy of `crates/chrys-cli/tests/decode_limits_guard.rs`'s own
 /// `strip_comments_and_strings`; see this file's own module comment for
 /// why a third copy exists rather than a shared one.
@@ -385,12 +513,17 @@ fn char_literal_end(chars: &[char], quote_at: usize) -> Option<usize> {
 
 /// Every write call this guard searches for. A new way to write must be
 /// added to this list, deliberately, or the guard stops covering it.
+///
+/// `fs::rename(` was added by the staged-write plan that introduced
+/// `write_baseline`'s swap-into-place step: this is the case this
+/// constant's own comment was written for.
 const WRITE_CALLS: &[&str] = &[
     "fs::create_dir_all(",
     "fs::remove_dir_all(",
     "fs::remove_file(",
     "fs::copy(",
     "fs::write(",
+    "fs::rename(",
 ];
 
 /// Return every `.rs` file directly under `dir` (this crate's own `src`
