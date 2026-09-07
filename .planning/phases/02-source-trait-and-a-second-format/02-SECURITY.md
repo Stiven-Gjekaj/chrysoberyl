@@ -66,7 +66,7 @@ every plan with a per-plan mitigation; it is listed once.
 | T-02-18 | Denial of Service | `Frame::crop_to_region` | high | mitigate | Checked arithmetic, returning `RegionOutOfBounds` rather than panicking or clamping. Verified: `chrys-source/src/lib.rs:59-72`, two `checked_add` calls covering the origin-plus-size overflow. | closed |
 | T-02-19 | Tampering | `read_hints_sidecar` | medium | mitigate | `deny_unknown_fields` on both structs (`hints.rs:20, 31`), so a misspelled key is a loud failure rather than a silent default that crops the wrong rectangle. A duplicate region name is refused (`hints.rs:86`). | closed |
 | T-02-20 | Denial of Service | TOML parse of an untrusted document | medium | mitigate | Parsed with `toml =1.1.5`, pinned (`Cargo.toml:22`). A malformed document returns an error carrying a line position; it does not panic. A second hand-written parser would be a second parser to secure. | closed |
-| T-02-21 | Elevation of Privilege | the engine's dependency graph | medium | mitigate | `chrys-source` declares no `serde` and no `toml` (measured: zero matches in its manifest). The sidecar structs live in the raster adapter. `chrys_source_declares_no_dependency` (`chrys-source/tests/manifest.rs:18`) makes that a red test rather than a convention. Measured on the engine graph: **0** image, serde, toml, gif, png, webp, tiff or wgpu crates across 48 crates. | closed |
+| T-02-21 | Elevation of Privilege | the engine's dependency graph | medium | mitigate | `chrys-source` declares no `serde` and no `toml` (measured: zero matches in its manifest). The sidecar structs live in the raster adapter. `chrys_source_declares_no_dependency` (`chrys-source/tests/manifest.rs:18`) makes that a red test rather than a convention, for a direct declaration in that one crate. Measured on the engine graph today: **0** image, serde, toml, gif, png, webp, tiff or wgpu crates across 48 crates. **The transitive guard does not cover serde or toml. See Deviations.** | closed |
 | T-02-22 | Information Disclosure | the unknown-region error message | low | accept | The message lists the region names the sidecars declare. Those names are already in a file the same caller can read. See Accepted Risks R-06. | closed |
 | T-02-SC | Tampering | crates.io installs | low | accept | `natord =1.0.9`, `png =0.18.1`, `toml =1.1.5`, `serde =1.0.229`, and the `gif` feature of the already-pinned `image =0.25.10`. All carry an `OK` verdict in `02-RESEARCH.md`'s Package Legitimacy Audit with a registry age, a download count and a source repository. Every version is pinned with `=` and `Cargo.lock` is committed. See Limitations. | closed |
 
@@ -93,6 +93,30 @@ did hold, including the `verdict` line at
 of T-02-05 is that a digest must never be quietly re-baselined into agreement
 with a regression, and that intent held. The literal wording no longer does,
 because one line was regenerated under a plan that named it first.
+
+**T-02-20's mitigation does not cover the size of the document it parses.**
+The threat says a malformed TOML document returns an error rather than
+panicking, and that holds. It says nothing about how large the document may be,
+and `read_hints_sidecar` reads it with `std::fs::read_to_string`
+(`hints.rs:65`), which has no cap. Measured on 2026-09-07: a 314,572,802-byte
+sidecar drives peak resident set size to 318,324,736 bytes, because the whole
+file is read before the parser is called. Every other decode path in this
+project bounds its allocation explicitly. This one does not. The code review
+records this as CR-01 and it is carried into `02-VERIFICATION.md` as a gap, not
+resolved here.
+
+**T-02-21's mitigation is narrower than the invariant it serves.** The threat
+is that `derive(Deserialize)` on `RegionHint` would put `serde` into
+`chrys-source` and therefore into the engine's graph. That specific threat is
+guarded: `chrys-source/tests/manifest.rs` line-scans that crate's own
+`Cargo.toml`, and it is proven able to go red on a planted dependency. But the
+project invariant is wider, and reads "chrys-core declares no format crate, no
+GPU crate, no serde and no toml". The transitive guard that reads the resolved
+tree, `DENIED_DEPENDENCY_CRATES` in `chrys-core/tests/determinism.rs`, lists
+twenty-one crates, all of them GPU or format. Measured: it names neither
+`serde` nor `toml`. So `serde` arriving in `chrys-core` through some path other
+than `chrys-source`'s own manifest is caught by nothing. The threat is closed;
+the invariant is half guarded. The code review records this as WR-02.
 
 ---
 
@@ -122,6 +146,10 @@ Stated so no reader credits this file with more than it did.
 - **The 48 crates in the engine graph were not each re-audited here.** The
   count and the category absence are measured; the per-crate verdicts come
   from `01-RESEARCH.md` and `02-RESEARCH.md`.
+- **Two findings from the code review are open, not closed here.** The
+  unbounded sidecar read and the transitive guard's missing `serde` and `toml`
+  entries are recorded in Deviations above and carried to the verification
+  report. This audit measured them; it did not fix them.
 
 ---
 
