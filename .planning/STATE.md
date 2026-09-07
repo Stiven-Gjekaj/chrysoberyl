@@ -2,18 +2,19 @@
 gsd_state_version: "1.0"
 current_phase: 3
 current_phase_name: Baseline, rules and CI gate
+current_plan: 4
 status: planning
-stopped_at: Phase 2 complete, ready to plan Phase 3
-last_updated: "2026-09-07T13:43:33.934Z"
+stopped_at: Completed 03-03-PLAN.md
+last_updated: "2026-09-07T19:08:41.014Z"
 last_activity: 2026-09-07
 last_activity_desc: Phase 2 complete, transitioned to Phase 3
-state_head: dd1eaee38d351667b4d1c0354dfa2c4c6f5c2b7d
+state_head: 5239e481b9932406d736ea57b547078b577a62b1
 progress:
   total_phases: 8
-  completed_phases: 1
-  total_plans: 14
-  completed_plans: 14
-  percent: 13
+  completed_phases: 0
+  total_plans: 18
+  completed_plans: 17
+  percent: 0
 ---
 
 # Project State
@@ -28,11 +29,12 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 3 — Baseline, rules and CI gate
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-09-07 — Phase 2 complete, transitioned to Phase 3
+Current Plan: 4
+Total Plans in Phase: 4
+Status: In progress
+Last activity: 2026-09-07 — Plan 03-03 complete
 
-Progress: [█░░░░░░░░░] 13%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -55,6 +57,11 @@ Progress: [█░░░░░░░░░] 13%
 - Trend: estimates run about twice the actual token cost
 
 *Updated after each plan completion*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 03-baseline-rules-and-ci-gate P03 | not captured | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -66,6 +73,7 @@ Recent decisions affecting current work:
 - Roadmap: merged research's suggested Phase 1 (raster spine) and Phase 2 (determinism CI) into one Phase 1, so the determinism proof lands as that phase's exit gate, not a separate later phase.
 - Roadmap: moved VIEW-01 through VIEW-04 to Phase 6, alongside the wgpu mirror, because the native window is built on Slint hosting a wgpu canvas and cannot exist before that infrastructure does.
 - Roadmap: kept PDF (Phase 5), video (Phase 7), and mesh (Phase 8) as single-requirement phases, because each carries exactly one new kind of risk and the project's sequencing constraint puts risk isolation ahead of packing phases full.
+- [Phase 3]: Named a frame after its own source file via a defaulted Source::load_named, wrote a TOML CI report before every exit-code branch, and added a twice-drilled static guard over every direct image-reader call site
 
 ### Pending Todos
 
@@ -88,6 +96,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-07
-Stopped at: Phase 2 complete, ready to plan Phase 3
-Resume file: None
+Last session: 2026-09-07T19:08:40.995Z
+Stopped at: Completed 03-03-PLAN.md
+Resume file: 03-04-PLAN.md

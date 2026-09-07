@@ -81,11 +81,11 @@ release. See ROADMAP.md for the order.
 ### Command Line and CI
 
 - [ ] **CLI-01**: The tool exits non-zero when a rule fails
-- [ ] **CLI-02**: The tool writes a report artifact that names each change by
+- [x] **CLI-02**: The tool writes a report artifact that names each change by
       kind, region and size
 - [ ] **CLI-03**: The tool compares two paths given on the command line and
       prints the verdict
-- [ ] **CLI-04**: Every decode call sets an explicit memory limit, so a
+- [x] **CLI-04**: Every decode call sets an explicit memory limit, so a
       malformed input fails instead of exhausting memory
 
 ### Native Window
@@ -161,9 +161,9 @@ release. See ROADMAP.md for the order.
 | BASE-03 | Phase 3 | Pending |
 | BASE-04 | Phase 3 | Pending |
 | CLI-01 | Phase 3 | Pending |
-| CLI-02 | Phase 3 | Pending |
+| CLI-02 | Phase 3 | Complete |
 | CLI-03 | Phase 3 | Pending |
-| CLI-04 | Phase 3 | Pending |
+| CLI-04 | Phase 3 | Complete |
 | SRC-04 | Phase 4 | Pending |
 | DET-05 | Phase 4 | Pending |
 | SRC-05 | Phase 5 | Pending |
