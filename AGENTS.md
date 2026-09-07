@@ -16,6 +16,10 @@ They also apply to a change that you start without a request.
 - Do not add a footer that says that a tool made the text.
 - Make these changes in the configuration of the tool.
   Do not remove the text manually each time.
+- This repository holds a `commit-msg` hook that removes such a trailer.
+  Turn it on one time in a new clone:
+  `git config core.hooksPath .githooks`
+  The hook removes the line even when a tool adds it on every commit.
 - Reason: a commit shows that a human read the code.
   That human answers questions about the code six months later.
   An agent cannot do this.
