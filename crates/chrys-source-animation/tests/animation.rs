@@ -49,6 +49,23 @@ fn a_frame_count_limit_below_the_fixture_size_refuses_and_names_the_limit() {
     }
 }
 
+/// Every frame of a container file's `load_named` names the file the
+/// whole container came from: an animation's frames are composited out of
+/// one file and have no name of their own more specific than that.
+#[test]
+fn load_named_names_every_frame_after_the_containers_own_file() {
+    let path = golden_root().join("formats").join("gif").join("base.gif");
+    let source = AnimationSource::new();
+    let named = source
+        .load_named(&path)
+        .expect("load_named the committed gif fixture");
+
+    assert_eq!(named.len(), 5);
+    for (name, _frame) in &named {
+        assert_eq!(name, "base.gif");
+    }
+}
+
 #[test]
 fn apng() {
     let path = golden_root().join("formats").join("apng").join("base.png");

@@ -134,7 +134,30 @@ impl Source for SequenceSource {
     type Error = SequenceError;
 
     fn load(&self, path: &Path) -> Result<Vec<Frame>, Self::Error> {
+        let named = self.load_named(path)?;
+        Ok(named.into_iter().map(|(_name, frame)| frame).collect())
+    }
+
+    /// List `path` once, decode once, and return each frame beside its
+    /// own file's name, in the same order `load` returns the frames.
+    ///
+    /// `load` is implemented in terms of this method, not the other way
+    /// round, so there is exactly one listing of the directory and one
+    /// decode pass. Two independent computations of the same sorted order
+    /// could drift from each other, and the pairing between a frame and
+    /// its name is precisely what must not drift (T-03-17).
+    fn load_named(&self, path: &Path) -> Result<Vec<(String, Frame)>, Self::Error> {
         let paths = sequence::list_sorted(path)?;
-        sequence::decode_all(path, &paths, &self.limits, &self.decode_limits)
+        let names: Vec<String> = paths
+            .iter()
+            .map(|file_path| {
+                file_path
+                    .file_name()
+                    .map(|name| name.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| file_path.display().to_string())
+            })
+            .collect();
+        let frames = sequence::decode_all(path, &paths, &self.limits, &self.decode_limits)?;
+        Ok(names.into_iter().zip(frames).collect())
     }
 }

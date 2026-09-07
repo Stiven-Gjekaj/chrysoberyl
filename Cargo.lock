@@ -121,6 +121,8 @@ dependencies = [
  "chrys-source-raster",
  "chrys-source-sequence",
  "clap",
+ "serde",
+ "toml",
 ]
 
 [[package]]

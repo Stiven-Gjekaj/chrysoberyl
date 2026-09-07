@@ -12,6 +12,8 @@ use chrys_source_raster::RasterSource;
 use chrys_source_sequence::SequenceSource;
 use clap::{Parser, Subcommand};
 
+mod report;
+
 /// A structural diff for raster images.
 #[derive(Parser)]
 #[command(name = "chrys")]
@@ -65,6 +67,14 @@ enum Command {
         /// is absent nothing changes at all.
         #[arg(long)]
         rule: Option<PathBuf>,
+
+        /// Write a TOML report naming every compared frame's own source
+        /// file, and every change's kind, region and size, to this path.
+        /// Composes with every other flag above and changes no exit code
+        /// and no stdout. When this flag is absent nothing at all
+        /// changes.
+        #[arg(long)]
+        report: Option<PathBuf>,
     },
 }
 
@@ -89,6 +99,7 @@ fn run() -> anyhow::Result<ExitCode> {
             region,
             all_frames,
             rule,
+            report,
         } => run_compare(
             &base,
             &candidate,
@@ -96,10 +107,12 @@ fn run() -> anyhow::Result<ExitCode> {
             region.as_deref(),
             all_frames,
             rule.as_deref(),
+            report.as_deref(),
         ),
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_compare(
     base_path: &Path,
     candidate_path: &Path,
@@ -107,13 +120,14 @@ fn run_compare(
     region: Option<&str>,
     all_frames: bool,
     rule_path: Option<&Path>,
+    report_path: Option<&Path>,
 ) -> anyhow::Result<ExitCode> {
     // Loaded before either side is decoded, so a bad rule file fails
     // before any image decode work happens at all.
     let rules = rule_path.map(chrys_rule::load_rules).transpose()?;
 
-    let base_frames = frames_for(base_path)?;
-    let candidate_frames = frames_for(candidate_path)?;
+    let (base_names, base_frames) = named_frames_for(base_path)?;
+    let (_candidate_names, candidate_frames) = named_frames_for(candidate_path)?;
 
     let (base_frames, candidate_frames) = match region {
         Some(name) => (
@@ -124,6 +138,68 @@ fn run_compare(
     };
 
     let verdicts = chrys_core::compare_sequence(&base_frames, &candidate_frames)?;
+
+    // A rule outcome is computed per frame, against that frame's own
+    // base-side hints and size (the size is read only to check a
+    // mask-scoped rule's own mask against it), only when --rule was
+    // given. When it is absent this stays entirely unevaluated, so the
+    // exit code below reads exactly as it did before this flag existed
+    // (CLI-03's regression guard), and the report below writes no
+    // `rule_outcome` key at all. Computed here, before any output branch
+    // runs, so the report below can carry it whichever branch below this
+    // point returns.
+    let outcomes: Option<Vec<chrys_rule::RuleOutcome>> = rules
+        .as_ref()
+        .map(|rules| {
+            verdicts
+                .iter()
+                .enumerate()
+                .map(|(index, verdict)| {
+                    let hints = base_frames
+                        .get(index)
+                        .map(|frame| frame.hints.as_slice())
+                        .unwrap_or(&[]);
+                    let frame_size = base_frames
+                        .get(index)
+                        .map(|frame| (frame.width, frame.height))
+                        .unwrap_or((0, 0));
+                    chrys_rule::evaluate(verdict, hints, rules, frame_size)
+                })
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .transpose()?;
+
+    // The report is written before any exit-code-bearing branch below
+    // returns, on every path that produced a verdict, including a
+    // non-zero exit and a refused pair: a report that only exists on
+    // success reports nothing about the run a person actually needs to
+    // read (T-03-15).
+    if let Some(report_path) = report_path {
+        let frames: Vec<report::FrameReport> = verdicts
+            .iter()
+            .enumerate()
+            .map(|(index, verdict)| {
+                let source = base_names.get(index).cloned().unwrap_or_default();
+                let hints = base_frames
+                    .get(index)
+                    .map(|frame| frame.hints.as_slice())
+                    .unwrap_or(&[]);
+                let region_outcomes = outcomes
+                    .as_ref()
+                    .map(|outcomes| outcomes[index].regions.as_slice());
+                report::frame_report(index, source, verdict, hints, region_outcomes)
+            })
+            .collect();
+        let document = report::Report {
+            meta: report::Meta {
+                base: base_path.display().to_string(),
+                candidate: candidate_path.display().to_string(),
+                rule: rule_path.map(|path| path.display().to_string()),
+            },
+            frame: frames,
+        };
+        report::write_report(report_path, &document)?;
+    }
 
     if hash_only {
         // A one-against-one sequence prints exactly the four digest lines
@@ -198,33 +274,10 @@ fn run_compare(
         println!("{changed} of {} frames changed", verdicts.len());
     }
 
-    // A rule outcome is computed per frame, against that frame's own
-    // base-side hints and size (the size is read only to check a
-    // mask-scoped rule's own mask against it), only when --rule was given.
-    // When it is absent this stays entirely unevaluated and the exit code
-    // below reads exactly as it did before this flag existed (CLI-03's
-    // regression guard).
-    let outcomes: Option<Vec<chrys_rule::RuleOutcome>> = rules
-        .as_ref()
-        .map(|rules| {
-            verdicts
-                .iter()
-                .enumerate()
-                .map(|(index, verdict)| {
-                    let hints = base_frames
-                        .get(index)
-                        .map(|frame| frame.hints.as_slice())
-                        .unwrap_or(&[]);
-                    let frame_size = base_frames
-                        .get(index)
-                        .map(|frame| (frame.width, frame.height))
-                        .unwrap_or((0, 0));
-                    chrys_rule::evaluate(verdict, hints, rules, frame_size)
-                })
-                .collect::<Result<Vec<_>, _>>()
-        })
-        .transpose()?;
-
+    // `outcomes` was computed above, before the output branches, so the
+    // report could carry it whichever branch returned; the exit code
+    // below reads it the same way it did before this flag existed
+    // (CLI-03's regression guard).
     let worst = verdicts
         .iter()
         .enumerate()
@@ -295,17 +348,22 @@ fn crop_frames_to_region(
         .collect()
 }
 
-/// Load the frames at `path`. A directory loads as a numbered frame
-/// sequence through `SequenceSource`. A file sniffed as a GIF, an APNG or
-/// an animated WebP loads through `AnimationSource`. Any other file loads
-/// as a single raster image through `RasterSource`, with no change to that
-/// path's behaviour.
-fn frames_for(path: &Path) -> anyhow::Result<Vec<Frame>> {
-    if path.is_dir() {
-        return Ok(SequenceSource::new().load(path)?);
-    }
-    if chrys_source_animation::sniff::is_animation(path)? {
-        return Ok(AnimationSource::new().load(path)?);
-    }
-    Ok(RasterSource::new().load(path)?)
+/// Load the frames at `path`, each paired with the name of the file it
+/// came from, through `Source::load_named`. A directory loads as a
+/// numbered frame sequence through `SequenceSource`, each frame beside
+/// its own file's name. A file sniffed as a GIF, an APNG or an animated
+/// WebP loads through `AnimationSource`, every frame beside that
+/// container's own name. Any other file loads as a single raster image
+/// through `RasterSource`, that one frame beside its own file's name.
+/// The three-way dispatch itself is unchanged from before this crate
+/// learned a frame's own name.
+fn named_frames_for(path: &Path) -> anyhow::Result<(Vec<String>, Vec<Frame>)> {
+    let named = if path.is_dir() {
+        SequenceSource::new().load_named(path)?
+    } else if chrys_source_animation::sniff::is_animation(path)? {
+        AnimationSource::new().load_named(path)?
+    } else {
+        RasterSource::new().load_named(path)?
+    };
+    Ok(named.into_iter().unzip())
 }

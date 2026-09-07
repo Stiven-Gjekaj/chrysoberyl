@@ -218,4 +218,22 @@ mod tests {
         assert_eq!(limits.max_height, 16384);
         assert_eq!(limits.max_alloc, 512 * 1024 * 1024);
     }
+
+    /// A single file's `load_named` names its one frame after that file's
+    /// own file name, using `Source::load_named`'s default body.
+    #[test]
+    fn load_named_on_a_single_file_names_the_frame_after_the_file() {
+        let path = std::env::temp_dir().join("chrys-source-raster-test-load-named.png");
+        image::RgbaImage::from_pixel(2, 2, image::Rgba([1, 2, 3, 4]))
+            .save(&path)
+            .expect("write a temp PNG for this test");
+
+        let source = RasterSource::new();
+        let result = source.load_named(&path);
+        std::fs::remove_file(&path).ok();
+
+        let named = result.expect("a well-formed PNG loads");
+        assert_eq!(named.len(), 1);
+        assert_eq!(named[0].0, "chrys-source-raster-test-load-named.png");
+    }
 }

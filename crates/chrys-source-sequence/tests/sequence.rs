@@ -40,6 +40,30 @@ fn loads_eleven_frames_in_natural_filename_order() {
 }
 
 #[test]
+fn load_named_pairs_each_frame_with_its_own_file_name_in_order() {
+    let dir = fixture_dir("base");
+    let named = SequenceSource::new()
+        .load_named(&dir)
+        .expect("load_named the base fixture");
+
+    assert_eq!(named.len(), 11);
+    let names: Vec<&str> = named.iter().map(|(name, _frame)| name.as_str()).collect();
+    assert_eq!(names[0], "frame1.png");
+    assert_eq!(names[1], "frame2.png");
+    assert_eq!(names[10], "frame11.png");
+
+    // The pairing carries the same frames `load` returns, in the same
+    // order, so load_named is not a second, independently computed view.
+    let frames = SequenceSource::new()
+        .load(&dir)
+        .expect("load the base fixture");
+    for (position, (_name, frame)) in named.iter().enumerate() {
+        assert_eq!(frame.pixels, frames[position].pixels);
+        assert_eq!(frame.index, position);
+    }
+}
+
+#[test]
 fn a_frame_count_limit_below_the_fixture_size_refuses_and_names_the_limit() {
     let dir = fixture_dir("base");
     let source = SequenceSource::with_limits(SequenceLimits {

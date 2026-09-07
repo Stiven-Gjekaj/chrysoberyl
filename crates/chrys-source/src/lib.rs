@@ -147,6 +147,47 @@ pub trait Source {
 
     /// Load the file at `path` and return its frames.
     fn load(&self, path: &Path) -> Result<Vec<Frame>, Self::Error>;
+
+    /// Load the file at `path` and return its frames, each paired with the
+    /// name of the file it came from.
+    ///
+    /// The default calls `load`, then pairs every returned frame with
+    /// `path`'s own file name, cloned once for every frame. That default
+    /// is correct for a source that reads one file into one frame, and it
+    /// is correct and honest for a source whose frames are composited out
+    /// of one container file and have no file of their own: every frame
+    /// of such a source shares that one container's own name, because
+    /// none of them has a name any more specific than that.
+    ///
+    /// This method exists instead of a `source_name` field on `Frame`
+    /// itself. A field on `Frame` would need a value in every one of the
+    /// struct literals that build one, and `chrys-core` alone builds
+    /// dozens; `Frame` stays exactly the shape it already is, and only the
+    /// one caller that needs a name (`chrys-cli`, writing its report)
+    /// asks for one, through this method, rather than every caller
+    /// carrying a name it does not use.
+    ///
+    /// Falls back to `path`'s own display form when `path` has no file
+    /// name component (for instance, when `path` is `.` or `/`), so this
+    /// method never returns an empty label.
+    fn load_named(&self, path: &Path) -> Result<Vec<(String, Frame)>, Self::Error> {
+        let name = file_name_or_display(path);
+        let frames = self.load(path)?;
+        Ok(frames
+            .into_iter()
+            .map(|frame| (name.clone(), frame))
+            .collect())
+    }
+}
+
+/// `path`'s own file name, or its whole display form when it has no file
+/// name component. Shared by every default and override of
+/// `Source::load_named`, so a path with no file name is handled the same
+/// way everywhere in this crate's own default body.
+fn file_name_or_display(path: &Path) -> String {
+    path.file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.display().to_string())
 }
 
 #[cfg(test)]
