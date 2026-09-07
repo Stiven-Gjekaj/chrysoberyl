@@ -49,7 +49,7 @@ reassigns as follows, and lands at eight phases, inside the 5-to-8 range for
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Raster engine and determinism proof** - Compare raster images and prove the verdict is identical across OS and CPU architecture.
+- [x] **Phase 1: Raster engine and determinism proof** - Compare raster images and prove the verdict is identical across OS and CPU architecture. (completed 2026-09-07)
 - [ ] **Phase 2: Source trait and a second format** - Add animation and frame-sequence input without a change to the comparison engine.
 - [ ] **Phase 3: Baseline, rules and CI gate** - Commit a baseline, scope tolerance by rule, and gate CI on the verdict.
 - [ ] **Phase 4: SVG rasterization** - Rasterize vector input on the CPU and prove the font and curve output is deterministic.
@@ -254,7 +254,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Raster engine and determinism proof | 8/8 | In Progress|  |
+| 1. Raster engine and determinism proof | 9/9 | Complete    | 2026-09-07 |
 | 2. Source trait and a second format | 5/5 | In Progress|  |
 | 3. Baseline, rules and CI gate | 0/TBD | Not started | - |
 | 4. SVG rasterization | 0/TBD | Not started | - |

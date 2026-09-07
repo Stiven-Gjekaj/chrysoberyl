@@ -12,38 +12,38 @@ release. See ROADMAP.md for the order.
 
 ### Comparison Engine
 
-- [ ] **CORE-01**: The engine names each change by kind (moved, added, removed,
+- [x] **CORE-01**: The engine names each change by kind (moved, added, removed,
       recoloured, resized), never as a pixel count alone
-- [ ] **CORE-02**: The engine registers a translated region and reports the
+- [x] **CORE-02**: The engine registers a translated region and reports the
       offset in pixels
-- [ ] **CORE-03**: The engine reports a colour change as a colour difference
+- [x] **CORE-03**: The engine reports a colour change as a colour difference
       value and the two colours
-- [ ] **CORE-04**: The engine groups changed pixels into labelled regions, each
+- [x] **CORE-04**: The engine groups changed pixels into labelled regions, each
       with a bounding box
-- [ ] **CORE-05**: The engine does not report an antialiasing difference that a
+- [x] **CORE-05**: The engine does not report an antialiasing difference that a
       person cannot see
-- [ ] **CORE-06**: The engine refuses a pair it cannot register, and says why,
+- [x] **CORE-06**: The engine refuses a pair it cannot register, and says why,
       instead of reporting a verdict it cannot support
-- [ ] **CORE-07**: The engine compares only near-identical pairs, and says so
+- [x] **CORE-07**: The engine compares only near-identical pairs, and says so
       when a pair is too different to register
 
 ### Determinism
 
-- [ ] **DET-01**: The same pair gives an identical verdict on Linux, macOS and
+- [x] **DET-01**: The same pair gives an identical verdict on Linux, macOS and
       Windows
-- [ ] **DET-02**: The same pair gives an identical verdict on x86-64 and
+- [x] **DET-02**: The same pair gives an identical verdict on x86-64 and
       aarch64
-- [ ] **DET-03**: CI proves DET-01 and DET-02 on every commit, with a hash of
+- [x] **DET-03**: CI proves DET-01 and DET-02 on every commit, with a hash of
       raw RGBA8 output and never of a re-encoded file
-- [ ] **DET-04**: No pixel that enters a comparison is produced by a GPU
+- [x] **DET-04**: No pixel that enters a comparison is produced by a GPU
 - [ ] **DET-05**: Text rasterization uses a font set pinned in the repository,
       never the host font database
-- [ ] **DET-06**: The comparison path calls no platform transcendental
+- [x] **DET-06**: The comparison path calls no platform transcendental
       function, and the build disables floating point contraction on that path
 
 ### Input Sources
 
-- [ ] **SRC-01**: A raster image pair is compared (PNG, JPEG, WebP, TIFF)
+- [x] **SRC-01**: A raster image pair is compared (PNG, JPEG, WebP, TIFF)
 - [ ] **SRC-02**: A numbered frame sequence pair is compared frame by frame
 - [ ] **SRC-03**: An animation pair is compared frame by frame (GIF, APNG,
       animated WebP)
@@ -134,19 +134,19 @@ release. See ROADMAP.md for the order.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CORE-01 | Phase 1 | Pending |
-| CORE-02 | Phase 1 | Pending |
-| CORE-03 | Phase 1 | Pending |
-| CORE-04 | Phase 1 | Pending |
-| CORE-05 | Phase 1 | Pending |
-| CORE-06 | Phase 1 | Pending |
-| CORE-07 | Phase 1 | Pending |
-| DET-01 | Phase 1 | Pending |
-| DET-02 | Phase 1 | Pending |
-| DET-03 | Phase 1 | Pending |
-| DET-04 | Phase 1 | Pending |
-| DET-06 | Phase 1 | Pending |
-| SRC-01 | Phase 1 | Pending |
+| CORE-01 | Phase 1 | Complete |
+| CORE-02 | Phase 1 | Complete |
+| CORE-03 | Phase 1 | Complete |
+| CORE-04 | Phase 1 | Complete |
+| CORE-05 | Phase 1 | Complete |
+| CORE-06 | Phase 1 | Complete |
+| CORE-07 | Phase 1 | Complete |
+| DET-01 | Phase 1 | Complete |
+| DET-02 | Phase 1 | Complete |
+| DET-03 | Phase 1 | Complete |
+| DET-04 | Phase 1 | Complete |
+| DET-06 | Phase 1 | Complete |
+| SRC-01 | Phase 1 | Complete |
 | SRC-02 | Phase 2 | Pending |
 | SRC-03 | Phase 2 | Pending |
 | SRC-08 | Phase 2 | Pending |
@@ -178,6 +178,7 @@ release. See ROADMAP.md for the order.
 | SRC-07 | Phase 8 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 42 total
 - Mapped to phases: 42
 - Unmapped: 0
