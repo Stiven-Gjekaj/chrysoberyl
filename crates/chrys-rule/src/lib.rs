@@ -8,6 +8,8 @@
 //! crate is the reason that stays true: a rule file arrives from wherever
 //! the input pair arrived from, and its parser lives outside the engine.
 
+#![forbid(unsafe_code)]
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
