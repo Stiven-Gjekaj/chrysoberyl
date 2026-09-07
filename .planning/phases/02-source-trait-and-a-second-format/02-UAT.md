@@ -1,5 +1,5 @@
 ---
-status: partial
+status: complete
 phase: 02-source-trait-and-a-second-format
 source: 02-01-SUMMARY.md, 02-02-SUMMARY.md, 02-03-SUMMARY.md, 02-04-SUMMARY.md, 02-05-SUMMARY.md
 started: 2026-09-07T01:00:00Z
@@ -8,7 +8,7 @@ updated: 2026-09-07T01:00:00Z
 
 ## Current Test
 
-[testing paused — 1 item needs a person]
+[testing complete]
 
 Tests 1 to 11 were run by the orchestrator against the built binary. Every one is
 mechanically observable. Test 12 is a judgment a measurement cannot settle.
@@ -77,24 +77,69 @@ observed: GitHub Actions run on `f493fb0`, all six digest jobs plus `agree` plus
 
 ### 12. The per-frame output is readable at length
 expected: a person scanning a hundred-frame sequence can find the changed frames
-result: [pending]
-reason: the current shape prints a `frame N` header and a verdict line for every
-frame, including identical ones. That is right for eleven frames. Nobody has read it
-for a hundred, and only a person can say whether it needs a summary line, a quiet
-mode, or nothing at all.
+result: issue
+reported: "Fail and record."
+severity: major
+observed: measured on a built hundred-frame pair in which five frames differ. The
+tool prints 200 lines: 100 `frame N` headers, 95 bare `identical` lines, and 5 lines
+that carry a verdict. 195 of 200 lines are noise. A person scanning the output reads
+a wall of `identical`. The exit code is 1, which is correct.
+
+The information is recoverable with a second tool. `grep -B1 -E
+'^(Recoloured|Moved|Added|Removed|Resized)'` returns `frame 6, 22, 23, 60, 87`
+cleanly. A tool that is only readable at length through another tool does not meet
+the expectation as written, and a sequence is the input family this phase exists to
+support.
+
+Two further observations from the same run, recorded so they are not lost:
+
+- The output numbers frames from zero while the files are named `frame001` to
+  `frame100`, so the printed `frame 6` is the file `frame007.png`. The off-by-one
+  between the report and the directory is a second reading cost.
+- Frames 22 and 23 print the same verdict text twice with nothing marking them as
+  one run of adjacent changes. A regression in a real animation usually spans
+  several frames, so this is the common case, not an edge case.
 
 ## Summary
 
 total: 12
 passed: 11
-issues: 0
-pending: 1
+issues: 1
+pending: 0
 skipped: 0
 blocked: 0
 
 ## Gaps
 
-None. No test produced an issue.
+- gap_id: G-02-12
+  truth: "A person scanning a hundred-frame sequence can find the changed frames."
+  status: failed
+  reason: "User reported: Fail and record. Measured on a hundred-frame pair with five
+    changed frames: 200 lines out, of which 5 carry a verdict and 195 do not. The
+    changed frames are only findable by piping the output through grep."
+  severity: major
+  test: 12
+  artifacts:
+    - path: "crates/chrys-cli/src/main.rs"
+      issue: "The multi-frame path prints a frame header and a verdict line for every
+        frame, including every identical one, with no summary line and no quiet mode."
+    - path: "crates/chrys-cli/src/main.rs"
+      issue: "The printed frame number starts at zero while the files are named from
+        one, so the report and the directory disagree by one."
+  missing:
+    - "Print only the frames that changed by default, and close with a count of the
+      frames that did not."
+    - "Keep the per-frame detail available behind a flag, so nothing that reads the
+      current shape loses it."
+    - "Make the printed frame number agree with the name of the file it describes."
+    - "Decide whether a run of adjacent frames carrying the same verdict prints once
+      or once per frame."
+  deferred_to: "phase 3"
+  deferred_reason: >
+    This is a reporting change, not an engine change. Phase 3 owns CLI-01 through
+    CLI-04, including the report artifact that names each change by kind, region and
+    size. Fixing the shape here and again there would write it twice. Phase 3's
+    success criteria carry it, and ROADMAP.md records it.
 
 Two limits recorded so they are not mistaken for coverage:
 
