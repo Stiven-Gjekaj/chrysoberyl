@@ -179,7 +179,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 03-02-PLAN.md — A rule scoped to a mask of white opaque pixels, and the shipped example
+- [x] 03-02-PLAN.md — A rule scoped to a mask of white opaque pixels, and the shipped example
 - [ ] 03-03-PLAN.md — The report names the file a frame came from, and every decode call site is guarded
 
 **Wave 3** *(blocked on Wave 2 completion)*
