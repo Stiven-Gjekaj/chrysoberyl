@@ -184,7 +184,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 03-04-PLAN.md — A person accepts a baseline, and nothing else does
+- [x] 03-04-PLAN.md — A person accepts a baseline, and nothing else does
 
 **Note**: plans 03-02 and 03-03 share the same wave because they touch no
 file in common. Plan 03-02 owns `crates/chrys-rule/` and the fixtures; plan
@@ -280,7 +280,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 |-------|----------------|--------|-----------|
 | 1. Raster engine and determinism proof | 9/9 | Complete    | 2026-09-07 |
 | 2. Source trait and a second format | 5/5 | Complete    | 2026-09-07 |
-| 3. Baseline, rules and CI gate | 3/4 | In Progress|  |
+| 3. Baseline, rules and CI gate | 4/4 | Executed    | - |
 | 4. SVG rasterization | 0/TBD | Not started | - |
 | 5. PDF page comparison | 0/TBD | Not started | - |
 | 6. wgpu mirror and native window | 0/TBD | Not started | - |
