@@ -1,0 +1,4 @@
+[[rule]]
+kind = "recoloured"
+mask = "masks/badge-cropped.png"
+max_delta_e = 116.0

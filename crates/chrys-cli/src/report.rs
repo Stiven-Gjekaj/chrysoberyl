@@ -38,14 +38,23 @@ pub struct Report {
     pub frame: Vec<FrameReport>,
 }
 
-/// The `meta` table: the paths this run compared, and the rule file it
-/// gated on, when one was given.
+/// The `meta` table: the paths this run compared, the rule file it gated
+/// on, when one was given, and the named region it compared inside, when
+/// one was given.
 #[derive(Debug, Serialize)]
 pub struct Meta {
     pub base: String,
     pub candidate: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rule: Option<String>,
+    /// The `--region` name this run compared inside. Absent entirely,
+    /// with the same `skip_serializing_if` `rule` already carries, when
+    /// `--region` was not given, so a report written without the flag
+    /// gains no key. Present so a reader can tell a region run from a
+    /// whole-frame run: without this, two runs over the same pair could
+    /// report a different set of changes with no way to tell why (CLI-02).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
 }
 
 /// One `[[frame]]` table: one compared index.

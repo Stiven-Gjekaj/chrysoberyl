@@ -593,6 +593,15 @@ fn write_rule_01() {
 /// 0: a mask ignoring alpha would tolerate the whole canvas silently, and
 /// this fixture is committed so that failure is checked by a test rather
 /// than believed.
+///
+/// `masks/badge-cropped.png` is the false-green fixture CR-01 exists to
+/// remove: fully white and opaque like `masks/badge.png`, but sized
+/// 70x60, the `badge` hint's own width and height, rather than the
+/// 256x256 frame. A mask sized to the crop instead of the frame is a
+/// realistic authoring mistake, and `mask-cropped-size.toml` names it
+/// with a limit (116.0) above the fixture's own measured colour delta
+/// (115.65), so only the mask-size check, not the tolerance, stands
+/// between this rule file and a wrongly green run.
 fn write_rule_01_masks(out_dir: &std::path::Path) {
     let masks_dir = out_dir.join("masks");
     std::fs::create_dir_all(&masks_dir)
@@ -619,8 +628,19 @@ fn write_rule_01_masks(out_dir: &std::path::Path) {
         .save(&transparent_mask_path)
         .unwrap_or_else(|e| panic!("write {}: {e}", transparent_mask_path.display()));
 
+    // Sized to the crop (the badge hint's own 70x60), not to the frame:
+    // this is the mask that produces CR-01's false green when it is
+    // checked against the wrong frame size.
+    let badge_cropped_mask =
+        RgbaImage::from_pixel(mask_width, mask_height, Rgba([255, 255, 255, 255]));
+    let badge_cropped_mask_path = masks_dir.join("badge-cropped.png");
+    badge_cropped_mask
+        .save(&badge_cropped_mask_path)
+        .unwrap_or_else(|e| panic!("write {}: {e}", badge_cropped_mask_path.display()));
+
     println!("wrote {}", badge_mask_path.display());
     println!("wrote {}", transparent_mask_path.display());
+    println!("wrote {}", badge_cropped_mask_path.display());
 
     // The same kind and the same measured tolerance `tolerate.toml`
     // already records (plan 03-01: the recoloured region's real, measured
@@ -629,16 +649,21 @@ fn write_rule_01_masks(out_dir: &std::path::Path) {
     let mask_tolerate =
         "[[rule]]\nkind = \"recoloured\"\nmask = \"masks/badge.png\"\nmax_delta_e = 116.0\n";
     let mask_transparent = "[[rule]]\nkind = \"recoloured\"\nmask = \"masks/white-on-transparency.png\"\nmax_delta_e = 116.0\n";
+    let mask_cropped_size = "[[rule]]\nkind = \"recoloured\"\nmask = \"masks/badge-cropped.png\"\nmax_delta_e = 116.0\n";
 
     let mask_tolerate_path = out_dir.join("mask-tolerate.toml");
     let mask_transparent_path = out_dir.join("mask-transparent.toml");
+    let mask_cropped_size_path = out_dir.join("mask-cropped-size.toml");
     std::fs::write(&mask_tolerate_path, mask_tolerate)
         .unwrap_or_else(|e| panic!("write {}: {e}", mask_tolerate_path.display()));
     std::fs::write(&mask_transparent_path, mask_transparent)
         .unwrap_or_else(|e| panic!("write {}: {e}", mask_transparent_path.display()));
+    std::fs::write(&mask_cropped_size_path, mask_cropped_size)
+        .unwrap_or_else(|e| panic!("write {}: {e}", mask_cropped_size_path.display()));
 
     println!("wrote {}", mask_tolerate_path.display());
     println!("wrote {}", mask_transparent_path.display());
+    println!("wrote {}", mask_cropped_size_path.display());
 }
 
 fn golden_root() -> std::path::PathBuf {

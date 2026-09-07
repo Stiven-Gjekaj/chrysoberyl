@@ -248,15 +248,48 @@ fn run_compare(
         verify_baseline_digests(name, store, &base_frames)?;
     }
 
-    let (base_frames, candidate_frames) = match region {
-        Some(name) => (
-            crop_frames_to_region(&base_frames, name, base_path)?,
-            crop_frames_to_region(&candidate_frames, name, candidate_path)?,
-        ),
-        None => (base_frames, candidate_frames),
-    };
+    // The pixel comparison reads the CROPPED frames when `--region` was
+    // given: `compared_base_frames` and `compared_candidate_frames`, each
+    // its own binding, never reusing `base_frames` or `candidate_frames`.
+    // Those two names stay bound to the UNCROPPED frames `named_frames_for`
+    // returned above for the rest of this function, so the rule engine,
+    // the report writer and every printed rectangle below read the frame a
+    // rule was authored against, not the crop (CR-01, T-03-27, T-03-28).
+    let region_crop: Option<RegionCrop> = region
+        .map(|name| -> anyhow::Result<RegionCrop> {
+            let base_cropped = crop_frames_to_region(&base_frames, name, base_path)?;
+            let candidate_cropped = crop_frames_to_region(&candidate_frames, name, candidate_path)?;
+            let origins = base_cropped.iter().map(|(_, origin)| *origin).collect();
+            let base_only: Vec<Frame> = base_cropped.into_iter().map(|(frame, _)| frame).collect();
+            let candidate_only: Vec<Frame> = candidate_cropped
+                .into_iter()
+                .map(|(frame, _)| frame)
+                .collect();
+            Ok((base_only, candidate_only, origins))
+        })
+        .transpose()?;
 
-    let verdicts = chrys_core::compare_sequence(&base_frames, &candidate_frames)?;
+    let compared_base_frames: &[Frame] = region_crop
+        .as_ref()
+        .map(|(base, _, _)| base.as_slice())
+        .unwrap_or(&base_frames);
+    let compared_candidate_frames: &[Frame] = region_crop
+        .as_ref()
+        .map(|(_, candidate, _)| candidate.as_slice())
+        .unwrap_or(&candidate_frames);
+    // With no `--region`, every origin is `(0, 0)`, so
+    // `translate_verdicts` below is a no-op by value and the flag-less
+    // path shares one code path with the `--region` path rather than a
+    // second, divergent one.
+    let origins: Vec<(u32, u32)> = region_crop
+        .as_ref()
+        .map(|(_, _, origins)| origins.clone())
+        .unwrap_or_else(|| vec![(0, 0); base_frames.len()]);
+
+    let verdicts = translate_verdicts(
+        chrys_core::compare_sequence(compared_base_frames, compared_candidate_frames)?,
+        &origins,
+    )?;
 
     // A rule outcome is computed per frame, against that frame's own
     // base-side hints and size (the size is read only to check a
@@ -314,6 +347,7 @@ fn run_compare(
                 base: base_path.display().to_string(),
                 candidate: candidate_path.display().to_string(),
                 rule: rule_path.map(|path| path.display().to_string()),
+                region: region.map(|name| name.to_string()),
             },
             frame: frames,
         };
@@ -321,18 +355,24 @@ fn run_compare(
     }
 
     if hash_only {
-        // A one-against-one sequence prints exactly the four digest lines
-        // phase 1's `compare --hash-only` printed, byte-identical to
-        // before this crate learned about sequences. A longer sequence
-        // prints one four-line block per index, with a `frame {index}`
-        // header before each block so the report stays parseable per
-        // frame. `verdicts.len() == 1` is the same rule the verdict-text
-        // branch below already uses to draw this line.
+        // `--hash-only` hashes the frames that were actually compared:
+        // `compared_base_frames`/`compared_candidate_frames`, explicitly,
+        // never `base_frames`/`candidate_frames` (which stay uncropped
+        // above this point and would otherwise hash the wrong bytes under
+        // `--region`, now that this function no longer shadows either
+        // name with a cropped value). A one-against-one sequence prints
+        // exactly the four digest lines phase 1's `compare --hash-only`
+        // printed, byte-identical to before this crate learned about
+        // sequences. A longer sequence prints one four-line block per
+        // index, with a `frame {index}` header before each block so the
+        // report stays parseable per frame. `verdicts.len() == 1` is the
+        // same rule the verdict-text branch below already uses to draw
+        // this line.
         if verdicts.len() == 1 {
-            let base_frame = base_frames
+            let base_frame = compared_base_frames
                 .first()
                 .ok_or_else(|| anyhow::anyhow!("{} decoded to zero frames", base_path.display()))?;
-            let candidate_frame = candidate_frames.first().ok_or_else(|| {
+            let candidate_frame = compared_candidate_frames.first().ok_or_else(|| {
                 anyhow::anyhow!("{} decoded to zero frames", candidate_path.display())
             })?;
             let digests =
@@ -342,10 +382,10 @@ fn run_compare(
         }
 
         for (position, verdict) in verdicts.iter().enumerate() {
-            let base_frame = base_frames.get(position).ok_or_else(|| {
+            let base_frame = compared_base_frames.get(position).ok_or_else(|| {
                 anyhow::anyhow!("{} has no frame at index {position}", base_path.display())
             })?;
-            let candidate_frame = candidate_frames.get(position).ok_or_else(|| {
+            let candidate_frame = compared_candidate_frames.get(position).ok_or_else(|| {
                 anyhow::anyhow!(
                     "{} has no frame at index {position}",
                     candidate_path.display()
@@ -465,9 +505,22 @@ fn verify_baseline_digests(name: &str, store: &Path, base_frames: &[Frame]) -> a
     Ok(())
 }
 
+/// The cropped base frames, the cropped candidate frames, and the base
+/// side's own per-frame crop origins, built once by `run_compare` when
+/// `--region` was given.
+type RegionCrop = (Vec<Frame>, Vec<Frame>, Vec<(u32, u32)>);
+
 /// Crop every frame in `frames` to the rectangle its own hint named
-/// `region` describes, failing loudly when a frame carries no hint of that
-/// name.
+/// `region` describes, paired with that frame's own crop origin (the
+/// hint's `x` and `y`), failing loudly when a frame carries no hint of
+/// that name.
+///
+/// The origin is produced here, at the one place the hint is looked up,
+/// so it cannot drift from the hint it came from: a sequence gets one
+/// origin per frame, because a hint can sit at a different place on each
+/// frame. A caller adds this origin back onto every rectangle the pixel
+/// comparison reports over the cropped frame, so the frame's own
+/// coordinate space wins over the crop's (CR-01).
 ///
 /// The error names `path`, the frame's own index, and the region names
 /// that frame does carry, so a person who mistyped a region learns the
@@ -476,7 +529,7 @@ fn crop_frames_to_region(
     frames: &[Frame],
     region: &str,
     path: &Path,
-) -> anyhow::Result<Vec<Frame>> {
+) -> anyhow::Result<Vec<(Frame, (u32, u32))>> {
     frames
         .iter()
         .map(|frame| {
@@ -498,9 +551,98 @@ fn crop_frames_to_region(
                         frame.index
                     )
                 })?;
-            Ok(frame.crop_to_region(hint)?)
+            let origin = (hint.x, hint.y);
+            let cropped = frame.crop_to_region(hint)?;
+            Ok((cropped, origin))
         })
         .collect()
+}
+
+/// Translate every `Region`'s own bounding box in `verdicts` by that
+/// frame's own crop origin from `origins` (`origins[index]` for
+/// `verdicts[index]`), so every rectangle a run reports afterwards, on
+/// standard output, in the report and in the rule engine, is stated in
+/// the UNCROPPED base frame's own coordinate space rather than the
+/// cropped rectangle the pixel comparison actually ran over.
+///
+/// This runs unconditionally, on both the flag-less path and the
+/// `--region` path: when `--region` was absent every entry of `origins`
+/// is `(0, 0)`, so the translated copy equals the original by value and
+/// standard output stays byte for byte what it was before this function
+/// existed (CLI-03). Sharing one code path for both is the point: no
+/// second place exists where a coordinate space can diverge from the
+/// other.
+///
+/// `Region.offset_px` is how far content moved, not where it is, so it
+/// is copied through unchanged; `bbox.width` and `bbox.height` are sizes
+/// and are copied through unchanged too. `Verdict::Identical` and
+/// `Verdict::Refused` carry no rectangle and are copied through
+/// unchanged.
+///
+/// The addition uses `checked_add` and fails the run, naming both
+/// numbers, when it overflows: `Frame::crop_to_region` already refuses a
+/// hint that does not fit inside the frame, so the sum provably fits and
+/// an overflow here means an assumption broke and a person needs to read
+/// which, not a value silently wrapped to a wrong answer.
+fn translate_verdicts(
+    verdicts: Vec<chrys_core::Verdict>,
+    origins: &[(u32, u32)],
+) -> anyhow::Result<Vec<chrys_core::Verdict>> {
+    verdicts
+        .into_iter()
+        .enumerate()
+        .map(|(index, verdict)| {
+            let (origin_x, origin_y) = origins.get(index).copied().unwrap_or((0, 0));
+            translate_verdict(verdict, origin_x, origin_y)
+        })
+        .collect()
+}
+
+/// Translate one `Verdict`'s own regions by `(origin_x, origin_y)`. See
+/// `translate_verdicts`' own doc comment for what moves and what does
+/// not.
+fn translate_verdict(
+    verdict: chrys_core::Verdict,
+    origin_x: u32,
+    origin_y: u32,
+) -> anyhow::Result<chrys_core::Verdict> {
+    match verdict {
+        chrys_core::Verdict::Changed { regions } => {
+            let translated = regions
+                .into_iter()
+                .map(|region| translate_region(region, origin_x, origin_y))
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            Ok(chrys_core::Verdict::Changed {
+                regions: translated,
+            })
+        }
+        identical_or_refused => Ok(identical_or_refused),
+    }
+}
+
+/// Translate one `Region`'s own `bbox.x` and `bbox.y` by
+/// `(origin_x, origin_y)`, using `checked_add` so an overflow fails
+/// loudly rather than wrapping to a wrong rectangle.
+fn translate_region(
+    mut region: chrys_core::Region,
+    origin_x: u32,
+    origin_y: u32,
+) -> anyhow::Result<chrys_core::Region> {
+    region.bbox.x = region.bbox.x.checked_add(origin_x).ok_or_else(|| {
+        anyhow::anyhow!(
+            "translating a change's own x ({}) by its frame's crop origin ({origin_x}) \
+             overflows a u32",
+            region.bbox.x
+        )
+    })?;
+    region.bbox.y = region.bbox.y.checked_add(origin_y).ok_or_else(|| {
+        anyhow::anyhow!(
+            "translating a change's own y ({}) by its frame's crop origin ({origin_y}) \
+             overflows a u32",
+            region.bbox.y
+        )
+    })?;
+    Ok(region)
 }
 
 /// Load the frames at `path`, each paired with the name of the file it
