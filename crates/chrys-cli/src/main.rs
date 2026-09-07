@@ -6,6 +6,8 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use chrys_baseline::BaselineStore;
+use chrys_baseline::golden::GoldenFileStore;
 use chrys_source::{Frame, Source};
 use chrys_source_animation::AnimationSource;
 use chrys_source_raster::RasterSource;
@@ -13,6 +15,11 @@ use chrys_source_sequence::SequenceSource;
 use clap::{Parser, Subcommand};
 
 mod report;
+
+/// The default baseline store root: a plain directory at the top of the
+/// repository, not a hidden one, so a person finds `MANIFEST.toml` and
+/// reads its diff in a pull request (BASE-01).
+const DEFAULT_STORE_ROOT: &str = "chrys-baselines";
 
 /// A structural diff for raster images.
 #[derive(Parser)]
@@ -25,11 +32,28 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// Compare two raster images and print a verdict.
+    ///
+    /// With no `--baseline`, this takes exactly two paths: the base image,
+    /// then the candidate. With `--baseline NAME`, this takes exactly one
+    /// path, the candidate, and the base side comes from the baseline
+    /// store instead.
     Compare {
-        /// The path to the base image.
-        base: PathBuf,
-        /// The path to the candidate image.
-        candidate: PathBuf,
+        /// The paths to compare. With no `--baseline`: the base image,
+        /// then the candidate, in that order. With `--baseline`: the
+        /// candidate alone.
+        #[arg(required = true, num_args = 1..=2)]
+        paths: Vec<PathBuf>,
+
+        /// Compare against the baseline of this name, read from the
+        /// baseline store, instead of a second positional path.
+        #[arg(long)]
+        baseline: Option<String>,
+
+        /// The baseline store root `--baseline` and `accept` both read
+        /// and write.
+        #[arg(long, default_value = DEFAULT_STORE_ROOT)]
+        store: PathBuf,
+
         /// Print the four-line digest report instead of the verdict text,
         /// and exit 0 even when the pair differs. Every digest covers raw
         /// RGBA8 bytes or the verdict's `Display` text, never a re-encoded
@@ -76,6 +100,21 @@ enum Command {
         #[arg(long)]
         report: Option<PathBuf>,
     },
+
+    /// Accept PATH as the new baseline named NAME.
+    ///
+    /// An accept is a statement: this candidate is now correct. Every
+    /// later comparison against NAME is measured against it, and nothing
+    /// in this tool can tell a correct accept from a mistaken one.
+    Accept {
+        /// The baseline's own name.
+        name: String,
+        /// The path to accept: a file or a directory.
+        path: PathBuf,
+        /// The baseline store root to accept into.
+        #[arg(long, default_value = DEFAULT_STORE_ROOT)]
+        store: PathBuf,
+    },
 }
 
 fn main() -> ExitCode {
@@ -93,23 +132,91 @@ fn run() -> anyhow::Result<ExitCode> {
     let cli = Cli::parse();
     match cli.command {
         Command::Compare {
-            base,
-            candidate,
+            paths,
+            baseline,
+            store,
             hash_only,
             region,
             all_frames,
             rule,
             report,
-        } => run_compare(
-            &base,
-            &candidate,
-            hash_only,
-            region.as_deref(),
-            all_frames,
-            rule.as_deref(),
-            report.as_deref(),
-        ),
+        } => {
+            let (base_path, candidate_path) =
+                base_and_candidate(paths, baseline.as_deref(), &store)?;
+            run_compare(
+                &base_path,
+                &candidate_path,
+                hash_only,
+                region.as_deref(),
+                all_frames,
+                rule.as_deref(),
+                report.as_deref(),
+                baseline.as_deref(),
+                &store,
+            )
+        }
+        Command::Accept { name, path, store } => run_accept(&name, &path, &store),
     }
+}
+
+/// Resolve `paths` and an optional `--baseline` name into the base and
+/// candidate paths `run_compare` operates on.
+///
+/// With no baseline name, `paths` must hold exactly two entries: the base,
+/// then the candidate, in that order. With a baseline name, `paths` must
+/// hold exactly one entry, the candidate; the base side comes from
+/// `store` by way of `BaselineStore::resolve`, which is itself the only
+/// place a never-accepted name becomes a loud error rather than a first
+/// silent accept (BASE-04). Clap is not asked to guess between these two
+/// shapes: the count is validated here, explicitly, in both directions.
+fn base_and_candidate(
+    paths: Vec<PathBuf>,
+    baseline: Option<&str>,
+    store: &Path,
+) -> anyhow::Result<(PathBuf, PathBuf)> {
+    match baseline {
+        Some(name) => {
+            if paths.len() != 1 {
+                anyhow::bail!(
+                    "compare --baseline takes exactly one path (the candidate); got {} path(s)",
+                    paths.len()
+                );
+            }
+            let baseline_store = GoldenFileStore::new(store.to_path_buf());
+            let base_path = baseline_store.resolve(name)?;
+            Ok((base_path, paths[0].clone()))
+        }
+        None => {
+            if paths.len() != 2 {
+                anyhow::bail!(
+                    "compare with no --baseline takes exactly two paths (the base, then the \
+                     candidate); got {} path(s)",
+                    paths.len()
+                );
+            }
+            Ok((paths[0].clone(), paths[1].clone()))
+        }
+    }
+}
+
+/// Accept `path` as the new baseline named `name`, in the store rooted at
+/// `store`.
+///
+/// An accept is a statement: this candidate is now correct. Every later
+/// comparison against `name` is measured against it, and nothing in this
+/// tool can tell a correct accept from a mistaken one. This is the only
+/// call site of `BaselineStore::accept` in the whole workspace.
+fn run_accept(name: &str, path: &Path, store: &Path) -> anyhow::Result<ExitCode> {
+    let (names, frames) = named_frames_for(path)?;
+    let digests: Vec<(String, String)> = names
+        .into_iter()
+        .zip(frames.iter())
+        .map(|(source, frame)| (source, chrys_core::hash::rgba8_digest(frame.rgba8())))
+        .collect();
+
+    let baseline_store = GoldenFileStore::new(store.to_path_buf());
+    baseline_store.accept(name, path, &digests)?;
+    Ok(ExitCode::from(0))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -121,6 +228,8 @@ fn run_compare(
     all_frames: bool,
     rule_path: Option<&Path>,
     report_path: Option<&Path>,
+    baseline: Option<&str>,
+    store: &Path,
 ) -> anyhow::Result<ExitCode> {
     // Loaded before either side is decoded, so a bad rule file fails
     // before any image decode work happens at all.
@@ -128,6 +237,16 @@ fn run_compare(
 
     let (base_names, base_frames) = named_frames_for(base_path)?;
     let (_candidate_names, candidate_frames) = named_frames_for(candidate_path)?;
+
+    // The manifest is checked, not decorated: when the base side came
+    // from the baseline store, every frame's digest is recomputed and
+    // compared against what MANIFEST.toml recorded for this name. A
+    // disagreement fails the run and names the baseline, the frame, and
+    // both digests, rather than silently comparing against a file the
+    // manifest no longer describes.
+    if let Some(name) = baseline {
+        verify_baseline_digests(name, store, &base_frames)?;
+    }
 
     let (base_frames, candidate_frames) = match region {
         Some(name) => (
@@ -308,6 +427,42 @@ fn verdict_rank(verdict: &chrys_core::Verdict, outcome: Option<&chrys_rule::Rule
         },
         chrys_core::Verdict::Refused { .. } => 2,
     }
+}
+
+/// Recompute each of `base_frames`' own digest and compare it against what
+/// `MANIFEST.toml` records for the baseline named `name`, in the store
+/// rooted at `store`.
+///
+/// `GoldenFileStore::resolve` never reads a digest; this is the caller
+/// that has the pixels, and checking here is what makes the manifest
+/// evidence rather than decoration. A disagreement, in either the frame
+/// count or one frame's own digest, fails the run and names the baseline,
+/// the frame, and both digests, so a hand-edited or a stale manifest
+/// cannot make a green run mean nothing.
+fn verify_baseline_digests(name: &str, store: &Path, base_frames: &[Frame]) -> anyhow::Result<()> {
+    let baseline_store = GoldenFileStore::new(store.to_path_buf());
+    let recorded = baseline_store.manifest_digests(name)?;
+
+    if recorded.len() != base_frames.len() {
+        anyhow::bail!(
+            "baseline \"{name}\" records {} frame(s) in its manifest, but the stored baseline \
+             decoded to {} frame(s)",
+            recorded.len(),
+            base_frames.len()
+        );
+    }
+
+    for (index, (source, recorded_digest)) in recorded.iter().enumerate() {
+        let computed_digest = chrys_core::hash::rgba8_digest(base_frames[index].rgba8());
+        if &computed_digest != recorded_digest {
+            anyhow::bail!(
+                "baseline \"{name}\" frame {index} (\"{source}\"): the manifest records digest \
+                 {recorded_digest}, but the stored file now produces {computed_digest}"
+            );
+        }
+    }
+
+    Ok(())
 }
 
 /// Crop every frame in `frames` to the rectangle its own hint named

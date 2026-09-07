@@ -1,0 +1,6 @@
+[[baseline]]
+name = "pair-01"
+
+[[baseline.frame]]
+source = "base.png"
+digest = "5a5f59948cbf0cfca0c432dfc439f3c48e6bd9f7d0dad442212440081fe584cc"
