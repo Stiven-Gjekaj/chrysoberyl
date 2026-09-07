@@ -525,6 +525,39 @@ mod tests {
     }
 
     #[test]
+    fn a_tolerance_field_wrong_for_its_kind_fails_naming_the_line() {
+        // max_delta_e does not belong to a `moved` rule.
+        let contents = "[[rule]]\nkind = \"moved\"\nregion = \"badge\"\nmax_delta_e = 5.0\n";
+        let error = load_temp_rules("wrong-field-for-kind", contents)
+            .expect_err("a tolerance field outside its own kind's set is refused");
+        match error {
+            RuleError::InvalidToleranceField {
+                line, field, kind, ..
+            } => {
+                assert_eq!(field, "max_delta_e");
+                assert_eq!(kind, "moved");
+                assert_eq!(
+                    line, 4,
+                    "the message should name the field's own line (line 4), not the \
+                     table's first line (line 1)"
+                );
+            }
+            other => panic!("expected RuleError::InvalidToleranceField, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn allow_combined_with_a_numeric_tolerance_is_refused() {
+        let contents = "[[rule]]\nkind = \"recoloured\"\nregion = \"badge\"\nallow = true\nmax_delta_e = 5.0\n";
+        let error = load_temp_rules("conflicting-tolerance", contents)
+            .expect_err("allow alongside a numeric tolerance is refused");
+        match error {
+            RuleError::ConflictingTolerance { .. } => {}
+            other => panic!("expected RuleError::ConflictingTolerance, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn a_rule_file_with_no_rule_table_loads_into_an_empty_list() {
         let loaded = load_temp_rules("empty-document", "# nothing here\n")
             .expect("a document with no [[rule]] table is not an error");

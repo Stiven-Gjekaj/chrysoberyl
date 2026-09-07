@@ -244,4 +244,264 @@ mod tests {
         // comment.
         assert!(outcome.is_clean());
     }
+
+    /// One test per `ChangeKind`, proving a tolerance means one thing per
+    /// kind of change: `moved` reads an offset, `recoloured` reads a
+    /// colour difference, and `added`/`removed`/`resized` read a bounding
+    /// box area. The final case proves a rule never tolerates a region of
+    /// a kind it does not itself name.
+    #[test]
+    fn tolerance_is_scoped_by_change_kind() {
+        let hints = vec![hint("badge", 0, 0, 100, 100)];
+
+        // moved: within the offset limit on both axes tolerates; above it
+        // on either axis does not.
+        let moved_rule = Rule {
+            kind: ChangeKind::Moved,
+            scope: Scope::Region("badge".to_string()),
+            tolerance: Tolerance::MaxOffsetPx(5),
+        };
+        let rules = LoadedRules {
+            rules: vec![moved_rule],
+        };
+        let within = Region {
+            kind: ChangeKind::Moved,
+            bbox: bbox(10, 10, 20, 20),
+            offset_px: Some((5, -5)),
+            colour_delta: None,
+        };
+        let outcome = evaluate(
+            &Verdict::Changed {
+                regions: vec![within],
+            },
+            &hints,
+            &rules,
+        );
+        assert_eq!(
+            outcome.regions,
+            vec![RegionOutcome::Tolerated { rule_index: 0 }]
+        );
+        let above = Region {
+            kind: ChangeKind::Moved,
+            bbox: bbox(10, 10, 20, 20),
+            offset_px: Some((6, 0)),
+            colour_delta: None,
+        };
+        let outcome = evaluate(
+            &Verdict::Changed {
+                regions: vec![above],
+            },
+            &hints,
+            &rules,
+        );
+        assert_eq!(outcome.regions, vec![RegionOutcome::Violation]);
+
+        // recoloured: at or below the colour limit tolerates.
+        let recoloured_rule = Rule {
+            kind: ChangeKind::Recoloured,
+            scope: Scope::Region("badge".to_string()),
+            tolerance: Tolerance::Colour {
+                max_delta_e: 10.0,
+                max_alpha_delta: 0,
+            },
+        };
+        let rules = LoadedRules {
+            rules: vec![recoloured_rule],
+        };
+        let region = Region {
+            kind: ChangeKind::Recoloured,
+            bbox: bbox(10, 10, 20, 20),
+            offset_px: None,
+            colour_delta: Some(ColourDelta {
+                delta_e: 10.0,
+                base: [0, 0, 0, 255],
+                candidate: [5, 5, 5, 255],
+            }),
+        };
+        let outcome = evaluate(
+            &Verdict::Changed {
+                regions: vec![region],
+            },
+            &hints,
+            &rules,
+        );
+        assert_eq!(
+            outcome.regions,
+            vec![RegionOutcome::Tolerated { rule_index: 0 }]
+        );
+
+        // added, removed, resized: at or below the area limit tolerates.
+        for kind in [ChangeKind::Added, ChangeKind::Removed, ChangeKind::Resized] {
+            let rule = Rule {
+                kind,
+                scope: Scope::Region("badge".to_string()),
+                tolerance: Tolerance::MaxAreaPx(500),
+            };
+            let rules = LoadedRules { rules: vec![rule] };
+            // 20 * 20 = 400, at or below the 500-pixel limit.
+            let region = Region {
+                kind,
+                bbox: bbox(10, 10, 20, 20),
+                offset_px: None,
+                colour_delta: None,
+            };
+            let outcome = evaluate(
+                &Verdict::Changed {
+                    regions: vec![region],
+                },
+                &hints,
+                &rules,
+            );
+            assert_eq!(
+                outcome.regions,
+                vec![RegionOutcome::Tolerated { rule_index: 0 }],
+                "kind {kind:?} should be tolerated at or below its area limit"
+            );
+        }
+
+        // allow = true tolerates every region of its own kind, in scope.
+        let allow_rule = Rule {
+            kind: ChangeKind::Added,
+            scope: Scope::Region("badge".to_string()),
+            tolerance: Tolerance::Allow(true),
+        };
+        let rules = LoadedRules {
+            rules: vec![allow_rule],
+        };
+        let large_added_region = Region {
+            kind: ChangeKind::Added,
+            bbox: bbox(0, 0, 100, 100),
+            offset_px: None,
+            colour_delta: None,
+        };
+        let outcome = evaluate(
+            &Verdict::Changed {
+                regions: vec![large_added_region],
+            },
+            &hints,
+            &rules,
+        );
+        assert_eq!(
+            outcome.regions,
+            vec![RegionOutcome::Tolerated { rule_index: 0 }]
+        );
+
+        // A rule of one kind never tolerates a region of another kind,
+        // even with a generous limit and a matching scope.
+        let moved_only_rule = Rule {
+            kind: ChangeKind::Moved,
+            scope: Scope::Region("badge".to_string()),
+            tolerance: Tolerance::MaxOffsetPx(1_000),
+        };
+        let rules = LoadedRules {
+            rules: vec![moved_only_rule],
+        };
+        let recoloured_region = Region {
+            kind: ChangeKind::Recoloured,
+            bbox: bbox(10, 10, 20, 20),
+            offset_px: None,
+            colour_delta: Some(ColourDelta {
+                delta_e: 0.0,
+                base: [0, 0, 0, 255],
+                candidate: [0, 0, 0, 255],
+            }),
+        };
+        let outcome = evaluate(
+            &Verdict::Changed {
+                regions: vec![recoloured_region],
+            },
+            &hints,
+            &rules,
+        );
+        assert_eq!(outcome.regions, vec![RegionOutcome::Violation]);
+    }
+
+    #[test]
+    fn a_moved_region_with_no_offset_is_a_violation_not_a_pass() {
+        let rule = Rule {
+            kind: ChangeKind::Moved,
+            scope: Scope::Region("badge".to_string()),
+            tolerance: Tolerance::MaxOffsetPx(1_000),
+        };
+        let hints = vec![hint("badge", 0, 0, 100, 100)];
+        let region = Region {
+            kind: ChangeKind::Moved,
+            bbox: bbox(10, 10, 20, 20),
+            offset_px: None,
+            colour_delta: None,
+        };
+        let rules = LoadedRules { rules: vec![rule] };
+        let outcome = evaluate(
+            &Verdict::Changed {
+                regions: vec![region],
+            },
+            &hints,
+            &rules,
+        );
+        assert_eq!(outcome.regions, vec![RegionOutcome::Violation]);
+    }
+
+    #[test]
+    fn a_recoloured_region_with_no_colour_delta_is_a_violation_not_a_pass() {
+        let rule = Rule {
+            kind: ChangeKind::Recoloured,
+            scope: Scope::Region("badge".to_string()),
+            tolerance: Tolerance::Colour {
+                max_delta_e: 1_000.0,
+                max_alpha_delta: 255,
+            },
+        };
+        let hints = vec![hint("badge", 0, 0, 100, 100)];
+        let region = Region {
+            kind: ChangeKind::Recoloured,
+            bbox: bbox(10, 10, 20, 20),
+            offset_px: None,
+            colour_delta: None,
+        };
+        let rules = LoadedRules { rules: vec![rule] };
+        let outcome = evaluate(
+            &Verdict::Changed {
+                regions: vec![region],
+            },
+            &hints,
+            &rules,
+        );
+        assert_eq!(outcome.regions, vec![RegionOutcome::Violation]);
+    }
+
+    /// The failure `chrys_core::ColourDelta`'s own doc comment predicts,
+    /// and phase 1 already paid for once: a colour tolerance with no
+    /// alpha limit must not silently swallow an alpha-only change.
+    #[test]
+    fn a_recoloured_rule_with_a_generous_colour_limit_does_not_tolerate_an_alpha_only_change() {
+        let rule = Rule {
+            kind: ChangeKind::Recoloured,
+            scope: Scope::Region("badge".to_string()),
+            tolerance: Tolerance::Colour {
+                max_delta_e: 1_000.0,
+                max_alpha_delta: 0,
+            },
+        };
+        let hints = vec![hint("badge", 0, 0, 100, 100)];
+        // Equal red, green and blue bytes; only the fourth byte differs.
+        let region = Region {
+            kind: ChangeKind::Recoloured,
+            bbox: bbox(10, 10, 20, 20),
+            offset_px: None,
+            colour_delta: Some(ColourDelta {
+                delta_e: 0.0,
+                base: [10, 20, 30, 255],
+                candidate: [10, 20, 30, 0],
+            }),
+        };
+        let rules = LoadedRules { rules: vec![rule] };
+        let outcome = evaluate(
+            &Verdict::Changed {
+                regions: vec![region],
+            },
+            &hints,
+            &rules,
+        );
+        assert_eq!(outcome.regions, vec![RegionOutcome::Violation]);
+    }
 }
