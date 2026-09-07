@@ -12,6 +12,12 @@ Notes/PAI.md
 # it is not evidence. The research documents beside it are.
 .planning/research/.cache/
 
+# The planner writes its token estimates and the actual costs here. That is
+# telemetry about how this repository was built, not evidence about what it
+# does. It stays on the machine that wrote it, where the planner still reads
+# it, and it is not published.
+.planning/estimation-calibration.json
+
 # Build output. Cargo.lock is committed on purpose; see AGENTS.md.
 /target
 **/*.rs.bk
