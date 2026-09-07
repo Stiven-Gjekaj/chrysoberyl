@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use chrys_source::{Frame, Source};
+use chrys_source_animation::AnimationSource;
 use chrys_source_raster::RasterSource;
 use chrys_source_sequence::SequenceSource;
 use clap::{Parser, Subcommand};
@@ -136,12 +137,16 @@ fn verdict_rank(verdict: &chrys_core::Verdict) -> u8 {
 }
 
 /// Load the frames at `path`. A directory loads as a numbered frame
-/// sequence through `SequenceSource`; any other path loads as a single
-/// raster image through `RasterSource`.
+/// sequence through `SequenceSource`. A file sniffed as a GIF, an APNG or
+/// an animated WebP loads through `AnimationSource`. Any other file loads
+/// as a single raster image through `RasterSource`, with no change to that
+/// path's behaviour.
 fn frames_for(path: &Path) -> anyhow::Result<Vec<Frame>> {
     if path.is_dir() {
-        Ok(SequenceSource::new().load(path)?)
-    } else {
-        Ok(RasterSource::new().load(path)?)
+        return Ok(SequenceSource::new().load(path)?);
     }
+    if chrys_source_animation::sniff::is_animation(path)? {
+        return Ok(AnimationSource::new().load(path)?);
+    }
+    Ok(RasterSource::new().load(path)?)
 }

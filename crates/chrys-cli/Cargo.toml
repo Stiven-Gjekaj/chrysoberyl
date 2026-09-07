@@ -16,6 +16,7 @@ path = "src/main.rs"
 chrys-source = { path = "../chrys-source" }
 chrys-source-raster = { path = "../chrys-source-raster" }
 chrys-source-sequence = { path = "../chrys-source-sequence" }
+chrys-source-animation = { path = "../chrys-source-animation" }
 chrys-core = { path = "../chrys-core" }
 clap.workspace = true
 anyhow.workspace = true
