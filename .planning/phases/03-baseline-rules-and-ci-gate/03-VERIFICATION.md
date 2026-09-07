@@ -1,190 +1,185 @@
 ---
 phase: 03-baseline-rules-and-ci-gate
-verified: 2026-09-07T00:00:00Z
-status: gaps_found
-score: 4/6 must-haves verified
-covered_files: [".planning/REQUIREMENTS.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-01-PLAN.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-01-SUMMARY.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-02-PLAN.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-02-SUMMARY.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-03-PLAN.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-03-SUMMARY.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-04-PLAN.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-04-SUMMARY.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-REVIEW.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-SECURITY.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-VALIDATION.md", "crates/chrys-baseline/src/golden.rs", "crates/chrys-baseline/src/lib.rs", "crates/chrys-cli/src/main.rs", "crates/chrys-cli/src/report.rs", "crates/chrys-rule/src/evaluate.rs", "crates/chrys-rule/src/lib.rs", "crates/chrys-rule/src/mask.rs", "crates/chrys-source/src/lib.rs", "examples/rules/example.toml"]
-covered_digest: "v1:sha256:381d00b0733767647fa79297987cea91b306def750d856e3b01527b337383c4e"
+verified: 2026-09-07T23:02:51Z
+status: passed
+score: 6/6 must-haves verified
+covered_files: [".planning/REQUIREMENTS.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-01-PLAN.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-01-SUMMARY.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-02-PLAN.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-02-SUMMARY.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-03-PLAN.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-03-SUMMARY.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-04-PLAN.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-04-SUMMARY.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-05-PLAN.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-05-SUMMARY.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-REVIEW.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-SECURITY.md", ".planning/phases/03-baseline-rules-and-ci-gate/03-VALIDATION.md", "crates/chrys-baseline/src/golden.rs", "crates/chrys-baseline/src/lib.rs", "crates/chrys-baseline/tests/store.rs", "crates/chrys-cli/src/main.rs", "crates/chrys-cli/src/report.rs", "crates/chrys-cli/tests/region_rule.rs", "crates/chrys-rule/src/evaluate.rs", "crates/chrys-rule/src/lib.rs", "crates/chrys-rule/src/mask.rs", "crates/chrys-source-raster/examples/make-fixtures.rs", "crates/chrys-source/src/lib.rs", "examples/rules/example.toml", "tests/golden/rule-01/mask-cropped-size.toml", "tests/golden/rule-01/masks/badge-cropped.png"]
+covered_digest: "v1:sha256:38d87a54268c9fd26117dd2dbe1e2aff7adc12524058f857bbd6e04bd36c2570"
 behavior_unverified: 0
 overrides_applied: 0
-gaps:
-  - truth: "The CLI compares two paths, prints the verdict, exits non-zero on a rule failure, and writes a report artifact that names each change by kind, region, and size."
-    status: failed
-    reason: >
-      CR-01 (unfixed) is not merely a broken flag combination that fails
-      closed. Live-driven on commit fd4d78d: the same mask-scoped rule file,
-      against the same real recoloured change (colour delta 115.65), gives
-      exit 3 (loud refusal — mask does not match the frame) when run
-      without --region, and exit 0 (silent pass, verdict text printed but
-      the process reports success) when --region is added, because
-      run_compare shadows base_frames/candidate_frames with the
-      region-cropped versions before computing rule outcomes, so a
-      mask-scoped rule's frame_size check runs against the cropped
-      rectangle instead of the frame the mask was authored against. A CI
-      job that gates on this exit code goes green on a real, untolerated
-      change. This is the exact unsafe-direction failure mode
-      judge_specifically Q4 asks to rule in or out; it is ruled in, with a
-      command transcript. The same shadowing also makes the --report
-      writer report `region: None` for every change whenever --region is
-      combined with --report (hints are always empty on the cropped
-      frame), so the report's "region" field is wrong in the same
-      combination.
-    artifacts:
-      - path: "crates/chrys-cli/src/main.rs"
-        issue: "run_compare (lines ~238-321) shadows base_frames/candidate_frames with crop_frames_to_region's output before computing rule outcomes and the report; a mask-scoped rule's frame_size and a region-scoped rule's hints are read from the cropped frame, not the frame the rule/mask was authored against."
-    missing:
-      - "Keep the original, uncropped frames alive under their own names for hint/size lookups; use a separate binding for the frames actually compared pixel-for-pixel (CR-01's own suggested fix)."
-      - "At minimum, until the coordinate-space question is resolved, refuse the combination of --region with --rule or --report with a loud, non-zero error rather than silently producing a wrong verdict."
-      - "A test exercising --region together with --rule and --report together (zero exist today, confirmed by grep across crates/chrys-cli/tests/)."
-  - truth: "A person accepts a new baseline explicitly through the CLI; the baseline store is durable and does not silently lose the last-known-good state."
-    status: failed
-    reason: >
-      CR-02 (unfixed, Critical in 03-REVIEW.md). GoldenFileStore::write_baseline
-      deletes the previous baseline directory before the new one is fully
-      written and before MANIFEST.toml is rewritten, with no staging and no
-      atomic rename. An I/O failure partway through (a full disk, a
-      permission error, a failed fs::copy on the Nth of M frames) destroys
-      the last-known-good baseline and leaves neither the old, complete
-      baseline nor a new, complete one. This does not falsify a CI verdict
-      by itself (verify_baseline_digests, T-03-21, will loudly catch the
-      resulting inconsistency on the *next* compare), but it directly
-      undermines BASE-04's own stated rationale ("nothing in this tool can
-      tell a correct accept from a mistaken one" presumes the prior correct
-      accept survives a failed attempt), and it is a genuine, reproducible
-      data-loss path in the one operation (`accept`) this phase's success
-      criterion 5 names explicitly.
-    artifacts:
-      - path: "crates/chrys-baseline/src/golden.rs"
-        issue: "write_baseline (lines 266-361): fs::remove_dir_all on the existing baseline_dir runs before fs::create_dir_all, the per-file fs::copy loop, and the MANIFEST.toml rewrite — none of which are staged or atomically renamed into place."
-    missing:
-      - "Stage the new baseline in a sibling temporary directory and the new MANIFEST.toml in a temporary file; only then atomically replace the old state with fs::rename for both, so a failure before the final rename leaves the previous, complete baseline untouched (CR-02's own suggested fix)."
+re_verification:
+  previous_status: gaps_found
+  previous_score: 4/6
+  gaps_closed:
+    - "The CLI compares two paths, prints the verdict, exits non-zero on a rule failure, and writes a report artifact that names each change by kind, region, and size. (CR-01, CR-01's false pass under `--region` plus a mask-scoped `--rule`)"
+    - "A person accepts a new baseline explicitly through the CLI; the baseline store is durable and does not silently lose the last-known-good state. (CR-02, the destructive-delete-before-write path in `write_baseline`)"
+  gaps_remaining: []
+  regressions: []
 deferred: []
 ---
 
 # Phase 3: Baseline, rules and CI gate — Verification Report
 
 **Phase Goal:** A person commits a baseline, scopes tolerance by rule, and gates CI on the verdict.
-**Verified:** 2026-09-07
-**Status:** gaps_found
-**Re-verification:** No — initial verification
+**Verified:** 2026-09-07T23:02:51Z
+**Status:** passed
+**Re-verification:** Yes — after gap closure (plan 03-05)
 
 ## Goal Achievement
+
+This is a full re-verification, not a diff against the prior report. Every
+truth below was re-tested against a freshly built release binary at
+`3adf9e6` (the phase's current HEAD, one commit past 03-05's own last task
+commit `3ca8ddc`, which only adds the plan's own SUMMARY.md), using my own
+independently constructed fixtures where the prior report's own defect was
+found, not the repository's committed ones alone.
 
 ### Observable Truths (Success Criteria)
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | A TOML rule file scopes tolerance by kind of change and by a named region or mask; the shipped example shows a scoped exclusion, never a bare global threshold. | ✓ VERIFIED | `Scope` (`crates/chrys-rule/src/lib.rs`) has exactly two variants, `Region` and `Mask`, no `Option`, no unscoped variant possible. `examples/rules/example.toml` read directly: every `[[rule]]` names `region` or `mask`; none is bare. `cargo tree -p chrys-core -e normal` (re-confirmed) shows zero `serde`/`toml`/`chrys-rule` edges. |
-| 2 | An unknown key or a malformed rule fails loudly and names the line. | ✓ VERIFIED | Ran `cargo test -p chrys-rule an_unknown_key_fails_naming_the_line -- --exact` myself: 1 passed. Test asserts the error message contains both "line" and the offending field name "bogus". `deny_unknown_fields` confirmed on the rule row type by direct read. |
-| 3 | A baseline hash manifest is committed to the repository. Committed golden files are the default store, reached through a trait, so a second backend needs no change to the engine. | ✓ VERIFIED | `chrys-baselines/MANIFEST.toml` exists and is not gitignored (`.gitignore` has no `baseline` entry). `pub trait BaselineStore` (`crates/chrys-baseline/src/lib.rs:22`) declares `resolve`/`accept` with an associated `Error` type; `GoldenFileStore` is the sole implementor referenced by `chrys-cli`. `chrys-baseline` depends on neither `chrys-core` nor `chrys-source` (re-confirmed by reading `Cargo.toml`). See gap on durability under truth 5/CR-02, which is a related but distinct defect from this criterion's literal text. |
-| 4 | The CLI compares two paths, prints the verdict, exits non-zero on a rule failure, and writes a report artifact that names each change by kind, region, and size. | ✗ FAILED | **Live-reproduced myself.** See "CR-01 Live Reproduction" below: the same real, untolerated recoloured change gives exit 0 (silent pass) when `--region` is combined with a mask-scoped `--rule`, versus exit 3 (loud refusal) without `--region`. The exit code is not reliably non-zero on a rule failure — it can be wrongly zero. The report's `region` field is also wrong in the same combination (always `None`). |
-| 5 | A person accepts a new baseline explicitly through the CLI. Nothing updates a baseline on its own, and every decode call sets an explicit memory limit. | ⚠️ Partially verified — see gap | The explicit-only, no-auto-update property is intact and drive-tested (orchestrator: `--baseline never-accepted` refused exit 3, creates nothing; `run_accept` is the sole call site of `BaselineStore::accept` in the workspace). Every decode call site is guarded (`decode_guarded`/`DecodeLimits`), confirmed by `#![forbid(unsafe_code)]` in 8/8 crates and the static call-site guard drilled red twice per 03-SECURITY.md. **However**, CR-02 (unfixed) means a failed `accept` can destroy the previously accepted, correct baseline with no staging or atomic rename — a durability defect directly against this criterion's spirit. See gap. |
-| 6 | The report names the file a frame came from, not only its index. | ✓ VERIFIED | `report::frame_report` receives `source` from `base_names`, which is captured from `named_frames_for(base_path)` **before** the `--region` shadowing point, so this criterion is unaffected by CR-01. Orchestrator's own drive test: report carries `index = 4` AND `source = "frame5.png"`. Confirmed unaffected by reading `main.rs`'s ordering of `base_names` vs. the later `base_frames` rebinding. |
+| 1 | A TOML rule file scopes tolerance by kind of change and by a named region or mask; the shipped example shows a scoped exclusion, never a bare global threshold. | ✓ VERIFIED | `Scope` (`crates/chrys-rule/src/lib.rs`) still has exactly two variants, `Region` and `Mask`, no `Option`, no unscoped variant possible. `examples/rules/example.toml` read directly: both `[[rule]]` tables name `region` or `mask`; neither is bare. Unaffected by plan 03-05. |
+| 2 | An unknown key or a malformed rule fails loudly and names the line. | ✓ VERIFIED | Ran `cargo test -p chrys-rule an_unknown_key_fails_naming_the_line -- --exact` myself: 1 passed. `deny_unknown_fields` confirmed present on the rule row type by direct read. Unaffected by plan 03-05. |
+| 3 | A baseline hash manifest is committed to the repository. Committed golden files are the default store, reached through a trait, so a second backend needs no change to the engine. | ✓ VERIFIED | `chrys-baselines/MANIFEST.toml` and `chrys-baselines/pair-01/base.png` are tracked by git (`git ls-files chrys-baselines`). `pub trait BaselineStore` (`crates/chrys-baseline/src/lib.rs:22`) still declares `resolve`/`accept` with an associated `Error` type; `GoldenFileStore` is the sole implementor. The write path behind this store changed shape (see truth 5) but the trait boundary and the committed-store default did not. |
+| 4 | The CLI compares two paths, prints the verdict, exits non-zero on a rule failure, and writes a report artifact that names each change by kind, region, and size. | ✓ VERIFIED | **CR-01 re-tested myself with my own, independently generated adversarial fixture** (a fresh 70x60 white-opaque PNG I hand-encoded with a standalone Python script, at `/tmp/verify-cr01/my-mask.png`, distinct from the repository's own committed `masks/badge-cropped.png`, plus my own rule TOML pointing at it): both `chrys compare base candidate --rule r70.toml` and the same command with `--region badge` added now exit **3** and both name "70x60 ... does not match the 256x256 frame". The false green (exit 0 under `--region`) that the prior verification demonstrated is gone. I also independently confirmed the coordinate-space fix: `--region badge` (no rule) reports `x=40, y=40`, byte-identical to the whole-frame run's own rectangle, not the crop-local `x=10, y=10`. I re-ran all four of plan 03-05's own `region_rule.rs` tests myself (4 passed) and the full `cargo test --workspace` (all green, no `FAILED` line). See "CR-01 Re-Reproduction" below. |
+| 5 | A person accepts a new baseline explicitly through the CLI. Nothing updates a baseline on its own, and every decode call sets an explicit memory limit. | ✓ VERIFIED | **CR-02 re-tested myself at the CLI level** (not merely by re-running the unit test): I accepted a first baseline, then obstructed the exact write step CR-02 named (pre-created a directory at `MANIFEST.toml.tmp`'s own path so the manifest write fails after every candidate file is already staged), and ran `chrys accept` again with a different candidate. The obstructed accept exited 3, and the previous baseline directory's own file and `MANIFEST.toml` were byte-for-byte unchanged (`sha1sum` before/after identical) with no leftover staging directory; `chrys compare --baseline` against the original candidate still resolved and reported `identical`. See "CR-02 Re-Reproduction" below. The explicit-only, no-auto-update property and the decode-limit guard are unaffected by this plan and remain intact (unchanged code paths, re-confirmed by reading). |
+| 6 | The report names the file a frame came from, not only its index. | ✓ VERIFIED | `report::frame_report` still receives `source` from `base_names`, captured before the region-crop block runs; my own `--region badge --report` run wrote `source = "base.png"` alongside `index = 0`. Unaffected by plan 03-05's fix, and the report additionally now carries a correct `region = "badge"` value (see truth 4's evidence and CLI-02 below), which the prior report found wrong in this exact combination. |
 
-**Score:** 4/6 truths verified (2 failed: #4 outright, #5 partially, tracked together as 2 gaps in frontmatter)
+**Score:** 6/6 truths verified.
 
-### CR-01 Live Reproduction (judge_specifically Q1, Q4)
+### CR-01 Re-Reproduction (my own fixture, not the repository's committed one)
 
-Reproduced directly against commit `fd4d78d` (HEAD), using `tests/golden/rule-01/base.png` and `candidate.png` (a real, substantial "recoloured" change: colour delta 115.65 at x=40,y=40,50x40) and a mask-scoped rule whose mask is fully white-opaque (tolerates everything) sized 70x60 — deliberately chosen to equal the `badge` hint's cropped dimensions:
+Built independently with a standalone Python PNG encoder (no PIL, no reuse
+of `make-fixtures.rs`), at `/tmp/verify-cr01/my-mask.png`: 70x60, every
+pixel `(255,255,255,255)` — sized to the `badge` hint's own cropped
+dimensions, exactly the property that produced the false green:
 
 ```
-$ chrys compare base.png candidate.png --rule rule70.toml
-mask masks/mask70x60_white.png is 70x60, which does not match the 256x256 frame it is scoped against
+$ ./target/release/chrys compare tests/golden/rule-01/base.png tests/golden/rule-01/candidate.png --rule /tmp/verify-cr01/r70.toml
+mask my-mask.png is 70x60, which does not match the 256x256 frame it is scoped against
 exit: 3
 
-$ chrys compare base.png candidate.png --rule rule70.toml --region badge
-Recoloured region at x=10, y=10, width=50, height=40, colour delta 115.65 (base [200, 40, 40, 255], candidate [40, 200, 200, 255])
-exit: 0
-```
-
-The identical rule file, against the identical real change, flips from a loud refusal to a silent pass purely because `--region` was added. This is a live-confirmed answer to judge_specifically Q4: **yes, the exit code can be wrong in the unsafe direction** — zero exit on a real, untolerated change — whenever `--region` is combined with a mask-scoped `--rule` and the mask's own dimensions happen to equal the region's cropped dimensions (the review calls this "a realistic authoring choice," and this reproduction shows it requires no unusual setup — a mask sized to match the region it is meant to scope is the natural way to author one). No test in the workspace exercises this combination (confirmed: zero matches for `region.*rule` patterns across `crates/chrys-cli/tests/`).
-
-This goes further than 03-REVIEW.md's own characterization and further than the orchestrator's framing ("It fails closed here, which is the safe direction"): that framing holds only for `Scope::Region` rules (hints become empty under a crop, so those always fail closed, as the orchestrator's own repro with `tests/golden/rule-01/tolerate.toml` showed). It does not hold for `Scope::Mask` rules, which fail *open* under the reproduced conditions.
-
-**Verdict: CR-01 blocks the phase goal.** The phase's entire purpose is "gates CI on the verdict," and this is a concretely demonstrated false-green path.
-
-### T-03-11 Investigation (judge_specifically Q2)
-
-Reproduced directly against commit `fd4d78d` (HEAD), matching the security file's own described scenario ("a 10x10 mask against a 256x256 frame, with no region flag") as closely as its wording allows, using a synthesized 10x10 RGBA PNG mask and a rule of `kind = "recoloured"` (matching the real change's own kind, which is a precondition for `rule_tolerates` ever reaching the mask-size check at all):
-
-```
-$ chrys compare base.png candidate.png --rule rule.toml
-(stdout: empty)
-(stderr): mask masks/mask10x10.png is 10x10, which does not match the 256x256 frame it is scoped against
+$ ./target/release/chrys compare tests/golden/rule-01/base.png tests/golden/rule-01/candidate.png --rule /tmp/verify-cr01/r70.toml --region badge
+mask my-mask.png is 70x60, which does not match the 256x256 frame it is scoped against
 exit: 3
-
-$ chrys compare base.png candidate.png --rule rule.toml --report report.toml
-(stderr): mask masks/mask10x10.png is 10x10, which does not match the 256x256 frame it is scoped against
-exit: 3
-(report.toml: not created)
 ```
 
-Also reproduced with `--region badge` added (mask 10x10 against the cropped 70x60 frame): same result — both sizes named (10x10 and 70x60), exit 3, no report.
+Both exit 3. Both name 70x60 against 256x256. The `--region` run no longer
+silently passes. This was built and run against a release binary I compiled
+myself in this session (`cargo build --release`), not a pre-existing one.
 
-**This does not match the security file's "reopened" account** (which reports exit 1/no stderr without `--report`, and exit 2/no report with `--report`). In every variant I drove — with the mask sized against the full frame, against the cropped region, with and without `--report` — the control worked exactly as `evaluate.rs:120` and the original (pre-correction) security file described: both sizes are named, the message goes to stderr only (confirmed by redirecting stdout and stderr separately), exit code is 3, and no report is written on the error path (consistent with `run_compare`'s `?`-propagation happening before the report-writing block is reached).
+Coordinate-space check, same fixtures, no rule:
 
-**Measured fact:** I could not reproduce the failure the orchestrator recorded. The mask-size-mismatch control is present, reachable, and correct on the current HEAD, by direct, repeated, varied reproduction. The most plausible explanation for the discrepancy is that the orchestrator's earlier run used a binary built before `ca6cf94` (which added the `#![forbid(unsafe_code)]` guard and is the last commit touching `chrys-rule` before HEAD) or some other stale-artifact condition, since the source at HEAD does not admit the behavior described. I am not able to confirm that explanation directly (I cannot rerun their exact steps), so I record this as a discrepancy for the human to reconcile, not as a settled root cause.
+```
+$ ./target/release/chrys compare tests/golden/rule-01/base.png tests/golden/rule-01/candidate.png --region badge
+Recoloured region at x=40, y=40, width=50, height=40, colour delta 115.65 ...
+exit: 1
+$ ./target/release/chrys compare tests/golden/rule-01/base.png tests/golden/rule-01/candidate.png
+Recoloured region at x=40, y=40, width=50, height=40, colour delta 115.65 ...
+exit: 1
+```
 
-**Verdict: T-03-11 does not block the phase**, on the strength of my own direct, repeated reproduction. `03-SECURITY.md`'s "reopened" correction should itself be corrected or re-verified by a human before being taken as ground truth, since it now disagrees with a live re-drive on the same commit.
+Identical rectangle reported with and without `--region`. The report
+written with `--region badge --report` names `region = "badge"` on both
+`[meta]` and the one `[[frame.change]]` table (I read the written file
+directly).
+
+### CR-02 Re-Reproduction (CLI-level, interrupted write)
+
+```
+$ ./target/release/chrys accept pair-01 tests/golden/rule-01/base.png --store /tmp/verify-cr02b/store
+(exit 0)
+$ mkdir -p /tmp/verify-cr02b/store/MANIFEST.toml.tmp
+$ ./target/release/chrys accept pair-01 tests/golden/rule-01/candidate.png --store /tmp/verify-cr02b/store
+/tmp/verify-cr02b/store/MANIFEST.toml.tmp: Is a directory (os error 21)
+exit: 3
+```
+
+`sha1sum` of `pair-01/base.png` and `MANIFEST.toml` before and after the
+obstructed accept are identical (`diff` of the two sha1sum captures
+produced no output). No leftover `.pair-01.accept-tmp` staging directory
+remained. `chrys compare --baseline pair-01 --store /tmp/verify-cr02b/store
+tests/golden/rule-01/base.png` still resolved and printed `identical`,
+exit 0. The previous, complete baseline survives a write interrupted
+exactly where CR-02 named the destructive risk (after files are staged,
+during the manifest write).
+
+**Note on residual scope, not a gap:** two `fs::rename` calls
+(`write_baseline`'s final swap of the staged directory and the temporary
+manifest into place) are not one atomic act. A failure of the second
+rename after the first succeeds is a narrower, lower-probability window
+than the one CR-02 named (both old and new state remain on disk under
+non-canonical names, recoverable by hand, not destroyed) and is explicitly
+acknowledged in `write_baseline`'s own doc comment as the window
+`verify_baseline_digests` fails closed against. This matches the phase's
+own T-03-30/T-03-31 threat register entries and is not a new finding
+against this phase's stated scope.
 
 ### Required Artifacts
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `crates/chrys-rule/src/lib.rs`, `mask.rs`, `evaluate.rs` | Rule schema, mask loading, evaluation | ✓ VERIFIED | Present, substantive, wired; `#![forbid(unsafe_code)]` confirmed present. |
-| `crates/chrys-baseline/src/lib.rs`, `golden.rs` | `BaselineStore` trait + `GoldenFileStore` impl | ✓ VERIFIED (with CR-02 caveat) | Trait has exactly `resolve`/`accept`; `GoldenFileStore` is sole caller; write path is not atomic (CR-02). |
-| `crates/chrys-cli/src/main.rs`, `report.rs` | CLI wiring: compare, accept, rule gate, report | ⚠️ WIRED BUT INCORRECT UNDER `--region` | Present and wired for the non-`--region` path; demonstrably wrong when `--region` combines with `--rule`/`--report` (CR-01). |
-| `examples/rules/example.toml` | Shipped scoped example | ✓ VERIFIED | Read directly; every rule scoped, none bare. |
-| `chrys-baselines/MANIFEST.toml` | Committed baseline manifest | ✓ VERIFIED | Exists, not gitignored, matches the trait-based store. |
+| `crates/chrys-rule/src/lib.rs`, `mask.rs`, `evaluate.rs` | Rule schema, mask loading, evaluation | ✓ VERIFIED | Present, substantive, wired; `#![forbid(unsafe_code)]` confirmed present. `resolve_mask_path` now returns `canonical_mask` (read directly at `crates/chrys-rule/src/mask.rs:201`), closing WR-01. |
+| `crates/chrys-baseline/src/lib.rs`, `golden.rs` | `BaselineStore` trait + `GoldenFileStore` impl | ✓ VERIFIED | Trait unchanged (`resolve`/`accept`); `write_baseline` rewritten as a staged write (stage in `.{name}.accept-tmp`, manifest in `MANIFEST.toml.tmp`, swap by rename), confirmed by direct read and by my own interrupted-write drill above. |
+| `crates/chrys-cli/src/main.rs`, `report.rs` | CLI wiring: compare, accept, rule gate, report | ✓ VERIFIED | `run_compare` keeps `base_frames`/`candidate_frames` uncropped for the whole function (confirmed by direct read); `compared_base_frames`/`compared_candidate_frames` hold the cropped pixels; `translate_verdicts` adds the crop origin back onto every `Region.bbox` unconditionally. `report::Meta.region` present and populated. |
+| `examples/rules/example.toml` | Shipped scoped example | ✓ VERIFIED | Unaffected; read directly, every rule scoped. |
+| `chrys-baselines/MANIFEST.toml` | Committed baseline manifest | ✓ VERIFIED | Tracked by git; unaffected by the write-path rewrite. |
+| `crates/chrys-cli/tests/region_rule.rs` | The test of `--region` combined with `--rule` and `--report` that did not exist before | ✓ VERIFIED | Exists, 4 tests, all pass on my own run: `a_rule_gives_the_same_exit_code_with_and_without_a_region`, `a_region_run_reports_the_rectangle_in_frame_coordinates`, `a_region_report_names_the_region_each_change_falls_in`, `the_mask_scoped_rule_refuses_the_untolerated_change_under_a_region`. |
 
 ### Key Link Verification
 
 | From | To | Via | Status | Details |
 |------|----|----|--------|---------|
-| `chrys-cli::run_compare` | `chrys_rule::evaluate` | direct call, per-frame | ⚠️ PARTIAL | Correct when `--region` absent; wrong `hints`/`frame_size` inputs when `--region` present (CR-01). |
-| `chrys-cli::run_compare` | `chrys_baseline::GoldenFileStore::resolve`/`verify_baseline_digests` | direct call | ✓ WIRED | Digest re-verification confirmed by orchestrator's tamper test and by reading `verify_baseline_digests`. |
-| `chrys-cli::run_accept` | `chrys_baseline::GoldenFileStore::accept` | sole call site | ✓ WIRED, ⚠️ NOT ATOMIC | Sole call site confirmed (T-03-22's guard); write itself is not crash-safe (CR-02). |
-| `chrys-cli::report::frame_report` | report `source`/`region`/`kind`/`size` fields | direct construction | ⚠️ PARTIAL | `source` correct always; `region` wrong under `--region` (CR-01); `kind`/`size` correct. |
+| `chrys-cli::run_compare` | `chrys_rule::evaluate` | direct call, per-frame, on the uncropped base frame's hints and size | ✓ WIRED | Confirmed correct with and without `--region` by my own fixture above; no longer PARTIAL. |
+| `chrys-cli::run_compare` | `chrys_baseline::GoldenFileStore::resolve`/`verify_baseline_digests` | direct call | ✓ WIRED | Unaffected by this plan; re-confirmed by reading. |
+| `chrys-cli::run_accept` | `chrys_baseline::GoldenFileStore::accept` | sole call site | ✓ WIRED, ATOMIC ENOUGH | Sole call site unaffected; write itself is now staged and swapped by rename, confirmed by my own interrupted-write drill. |
+| `chrys-cli::report::frame_report` | report `source`/`region`/`kind`/`size` fields | direct construction | ✓ WIRED | `region` now correct under `--region` (confirmed by my own run above); no longer PARTIAL. |
 
 ### Requirements Coverage
 
 | Requirement | Source Plan | Status | Evidence |
 |---|---|---|---|
-| RULE-01 | 03-01 | ✓ SATISFIED | Tolerance scoped by `ChangeKind`; library-level, unaffected by CLI-layer CR-01. |
-| RULE-02 | 03-01, 03-02 | ✓ SATISFIED | `Scope::Region`/`Scope::Mask` both implemented and tested at the `chrys-rule` level. |
-| RULE-03 | 03-01, 03-02 | ✓ SATISFIED | No computable field in the rule schema (per 03-REVIEW.md, re-confirmed by reading `lib.rs`). |
-| RULE-04 | 03-01, 03-02 | ✓ SATISFIED | Unscoped rule refused via `validate_row`; shipped example fully scoped. |
+| RULE-01 | 03-01 | ✓ SATISFIED | Tolerance scoped by `ChangeKind`; unaffected by this round. |
+| RULE-02 | 03-01, 03-02, 03-05 | ✓ SATISFIED | `Scope::Region`/`Scope::Mask` both implemented and tested; `resolve_mask_path` now returns the verified canonical path (WR-01 closed), confirmed by direct read and by re-running `cargo test -p chrys-rule --test mask`. |
+| RULE-03 | 03-01, 03-02 | ✓ SATISFIED | No computable field in the rule schema; unaffected. |
+| RULE-04 | 03-01, 03-02 | ✓ SATISFIED | Unscoped rule refused via `validate_row`; `Scope`'s doc comment now correctly names `validate_row`/`RuleRow` (IN-01 closed). |
 | RULE-05 | 03-01 | ✓ SATISFIED | `an_unknown_key_fails_naming_the_line` re-run by me, passes. |
-| BASE-01 | 03-04 | ✓ SATISFIED | `MANIFEST.toml` committed, not gitignored. |
-| BASE-02 | 03-04 | ✓ SATISFIED | Per 03-REVIEW.md's read of `tests/store.rs`'s byte-for-byte assertion; not independently re-run this session. |
-| BASE-03 | 03-04 | ✓ SATISFIED | Trait has exactly `resolve`/`accept`; `GoldenFileStore` sole impl referenced by `chrys-cli`. |
-| BASE-04 | 03-04 | ✓ SATISFIED, DURABILITY GAP ADJACENT | `resolve` on an unaccepted name errors (drive-tested by orchestrator); the *separate* durability defect is CR-02, tracked as its own gap rather than a BASE-04 failure, since BASE-04's own text is about `resolve`, not write-crash-safety. |
-| CLI-01 | 03-01 | ✗ BLOCKED | "Exits non-zero when a rule fails" is falsified by the CR-01 live reproduction above: exit 0 on a real, untolerated change under `--region` + mask-scoped `--rule`. |
-| CLI-02 | 03-03 | ⚠️ PARTIAL | Report correct without `--region`; `region` field wrong when `--region` is combined with `--report` (CR-01). |
-| CLI-03 | 03-01, 03-04 | ✓ SATISFIED | Regression guard (`a_second_run_gives_byte_identical_stdout`) unaffected; `base_and_candidate` path count validation confirmed by reading. |
-| CLI-04 | 03-02, 03-03 | ✓ SATISFIED | Static call-site guard, drilled red twice per 03-SECURITY.md; `#![forbid(unsafe_code)]` in 8/8 crates. |
+| BASE-01 | 03-04 | ✓ SATISFIED | `MANIFEST.toml` committed, tracked. |
+| BASE-02 | 03-04 | ✓ SATISFIED | Byte-for-byte copy behaviour unchanged by the staged-write rewrite (same copy rules, confirmed by reading). |
+| BASE-03 | 03-04 | ✓ SATISFIED | Trait unchanged; `GoldenFileStore` sole impl. |
+| BASE-04 | 03-04, 03-05 | ✓ SATISFIED | **CR-02 closed.** An accept whose manifest write fails leaves the previous baseline byte-for-byte intact and `resolve` still finds it, confirmed by my own CLI-level interrupted-write drill above, not merely by re-running the shipped unit test (which also passes: `a_failed_accept_leaves_the_previous_baseline_intact`, `a_stale_staging_directory_contributes_no_file_to_the_next_accept`, `only_the_accept_path_writes_to_the_store`, all re-run by me). |
+| CLI-01 | 03-01, 03-05 | ✓ SATISFIED | **CR-01 closed.** "Exits non-zero when a rule fails" now holds with and without `--region`, confirmed against my own independently built adversarial mask fixture: exit 3 both ways, no false green. |
+| CLI-02 | 03-03, 03-05 | ✓ SATISFIED | Report's `region` field now correct when `--region` is combined with `--report`, confirmed by my own run above. |
+| CLI-03 | 03-01, 03-04, 03-05 | ✓ SATISFIED | `cargo test -p chrys-cli --test digest` re-run by me: passes; the flag-less path is byte-identical, confirmed by the translation being a no-op by value with origin `(0,0)`. |
+| CLI-04 | 03-02, 03-03 | ✓ SATISFIED | Static call-site guard and `#![forbid(unsafe_code)]` in 8/8 crates; unaffected by this round. |
 
-**No orphaned requirements**: all 13 IDs (RULE-01..05, BASE-01..04, CLI-01..04) are claimed by one of the four plans' `requirements:` frontmatter, confirmed by grep.
+**No orphaned requirements**: all 13 IDs (RULE-01..05, BASE-01..04, CLI-01..04) are claimed by one of the five plans' `requirements:` frontmatter (03-05 additionally claims CLI-01, CLI-02, BASE-04, RULE-02 as the gap-closure plan), confirmed by grep.
 
 ### Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 |------|------|---------|----------|--------|
-| `crates/chrys-cli/src/main.rs` | ~238-321 | Variable shadowing hides a coordinate-space bug (CR-01) | 🛑 Blocker | Unsafe false-pass on CI gate, demonstrated live. |
-| `crates/chrys-baseline/src/golden.rs` | 266-361 | Non-atomic multi-step write with a destructive first step | 🛑 Blocker | Data-loss path on `accept` failure (CR-02). |
-| `crates/chrys-rule/src/mask.rs` | 162-193 | Check-then-use path resolution (WR-01) | ⚠️ Warning | Defense-in-depth gap only; no attacker-controlled concurrent process in this project's stated threat model. Not blocking. |
-| `crates/chrys-rule/src/lib.rs` | 84-99, 405-420 | Doc comment overstates "type-level" refusal (IN-01) | ℹ️ Info | Documentation accuracy only. Not blocking. |
+| — | — | No `TBD`/`FIXME`/`XXX` marker found in any file this phase (including plan 03-05) touched | — | Scanned directly across all files in `covered_files`. |
+| `crates/chrys-baseline/src/golden.rs` | 283-294 | Documented, acknowledged non-atomicity between the two final swap-renames | ℹ️ Info | Explicitly documented and mitigated by `verify_baseline_digests`'s fail-closed behavior (T-03-30/T-03-31 in the phase's own threat register); not a new finding, not blocking. |
 
-No unresolved `TBD`/`FIXME`/`XXX` markers found in the files this phase touched (checked via the same file list as `covered_files`).
+The two prior 🛑 Blockers (CR-01's shadowing bug, CR-02's destructive first step) are both gone from the current source: confirmed by direct read of `run_compare` (no rebinding of `base_frames`/`candidate_frames` to a cropped value found anywhere in the function) and of `write_baseline` (no `fs::remove_dir_all` on the live baseline directory before the new state is staged).
 
 ### Behavioral Spot-Checks
 
 | Behavior | Command | Result | Status |
 |----------|---------|--------|--------|
-| Unknown-key rule fails naming the field and the line | `cargo test -p chrys-rule an_unknown_key_fails_naming_the_line -- --exact` | 1 passed | ✓ PASS |
-| CR-01 exists and is live-exploitable | Manual `chrys compare` drive, both without and with `--region` | Exit 3 → Exit 0 on the identical real change | ✓ CONFIRMED (this is the failing behavior, not a passing check) |
-| T-03-11 mask-size-mismatch control works | Manual `chrys compare` drive, with/without `--region`/`--report` | Both sizes named, stderr only, exit 3, no report, in every variant | ✓ PASS (contradicts 03-SECURITY.md's "reopened" note) |
-| Full workspace suite still green | `cargo test --workspace` (one full run, per the single-full-run rule) | 0 failures across all crates | ✓ PASS |
+| CR-01 is closed against my own, independently built adversarial mask | manual `chrys compare` drive, my own fixture, both without and with `--region` | Exit 3 both ways, both name 70x60 vs 256x256 | ✓ PASS |
+| Coordinate space is one space, with and without `--region` | manual `chrys compare` drive | Identical `x=40, y=40` rectangle both ways | ✓ PASS |
+| Report names the compared region under `--region` | manual `chrys compare --region badge --report` | `meta.region` and the change's own `region` both read `"badge"` | ✓ PASS |
+| CR-02 is closed against a CLI-level interrupted write | manual `chrys accept` drive, obstruct `MANIFEST.toml.tmp`, retry | Previous baseline byte-for-byte unchanged, `resolve` still works | ✓ PASS |
+| Plan 03-05's own new tests pass | `cargo test -p chrys-cli --test region_rule` | 4 passed, 0 failed | ✓ PASS |
+| Plan 03-05's own new durability/guard tests pass | `cargo test -p chrys-baseline --test store` (three named tests) | 3 passed, 0 failed | ✓ PASS |
+| Mask-path fix unbroken | `cargo test -p chrys-rule --test mask` and unknown-key test | passed | ✓ PASS |
+| Full workspace suite still green | `cargo test --workspace` (one full run) | 0 failures across all crates, all `test result: ok` | ✓ PASS |
+| Lints clean | `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --check` | both clean | ✓ PASS |
+| Engine boundary unmoved, whole phase range, resolved hashes | `bash scripts/engine-boundary-drill.sh 29f5add $(git rev-parse 3adf9e6)` | 2 of 2 drills behaved as expected | ✓ PASS |
+
+**On `scripts/engine-boundary-drill.sh`'s own `HEAD`-literal argument:** confirmed the script gives a false FAILED when the literal string `HEAD` is passed as `<last-commit>`, because the script re-resolves `$2` inside its own disposable worktree, whose `HEAD` has by then advanced past the planted-defect commit drill one made. This is the script's own argument-handling gotcha, already documented in 03-05-SUMMARY.md's "Issues Encountered", and is not recorded here as a defect in phase 3's own code. The drill was re-run with a resolved hash and passed 2 of 2.
 
 ### Probe Execution
 
@@ -192,23 +187,22 @@ No `scripts/*/tests/probe-*.sh` files exist in this repository and none are refe
 
 ### Human Verification Required
 
-None required to determine phase status — both blocking issues (CR-01, CR-02) are conclusively demonstrated by direct, reproducible command-line evidence, not matters of taste or visual judgment. One item is flagged for human reconciliation rather than technical re-verification:
-
-1. **T-03-11's "reopened" account in 03-SECURITY.md vs. this report's direct reproduction**
-   **Test:** Re-run the orchestrator's exact original steps (their mask file, their exact commands) if those artifacts still exist, to find why their run differed from mine.
-   **Expected:** Either the discrepancy traces to a stale binary/build artifact on the orchestrator's side (in which case 03-SECURITY.md's "reopened" note should be corrected back to closed), or a real, narrower reproduction condition is found that I did not hit.
-   **Why human:** I do not have access to the orchestrator's exact prior session state (build artifacts, exact mask file, exact working directory) to mechanically diff against my own reproduction; a human with access to both sessions' history can reconcile this faster than further guessing on my part.
+None. Both previously blocking findings (CR-01, CR-02) are conclusively demonstrated closed by direct, reproducible command-line evidence gathered independently in this session, against a release binary built in this session, using fixtures I constructed myself where the original defect was found (CR-01's mask) and a CLI-level (not merely unit-test-level) interruption for CR-02. All six roadmap success criteria and all 13 requirement IDs are satisfied. The prior report's own T-03-11 discrepancy (already resolved as "does not block the phase" in that same report, on the strength of its own direct reproduction) required no further action this round; it was not reopened by anything found in this verification.
 
 ## Gaps Summary
 
-Two unfixed Critical findings from 03-REVIEW.md block this phase's goal, and both are now backed by live reproduction rather than by reading the review alone:
-
-1. **CR-01** turns "gates CI on the verdict" into an unsafe gate under a realistic, untested flag combination (`--region` + a mask-scoped `--rule`): the same real, substantial change gives exit 3 without `--region` and exit 0 with it. This is a false-green path on the exact mechanism the phase exists to build.
-2. **CR-02** is a genuine, reproducible-by-inspection (not independently re-triggered this session, since it requires injecting an I/O failure) data-loss path in `accept`, the phase's other headline operation: a failed accept can destroy the last-known-good baseline with no staging or atomic rename.
-
-Both require code changes before this phase can be considered to have achieved its goal safely. T-03-11, by contrast, is **not** a gap: direct, repeated, varied reproduction on the current HEAD shows the mask-size-mismatch control working correctly, contradicting the "reopened" note in 03-SECURITY.md. That file's correction should itself be revisited by a human, but it does not block this phase.
+None. Both Critical findings from 03-REVIEW.md (CR-01, CR-02) are closed,
+independently confirmed against fixtures and interruption points I built
+myself rather than reusing only the executor's own committed test
+artifacts. The two smaller findings from the same review (WR-01, IN-01)
+are also closed. The full workspace test suite passes (0 failures),
+clippy and fmt are clean, and the engine boundary (`crates/chrys-core`)
+is confirmed unmoved across the whole of phase 3's commit range using a
+resolved-hash invocation of the phase-gate drill script. Phase 3's goal —
+a person commits a baseline, scopes tolerance by rule, and gates CI on the
+verdict — is achieved.
 
 ---
 
-_Verified: 2026-09-07_
+_Verified: 2026-09-07T23:02:51Z_
 _Verifier: Claude (gsd-verifier)_
