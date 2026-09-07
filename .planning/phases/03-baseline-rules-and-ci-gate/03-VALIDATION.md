@@ -2,7 +2,7 @@
 phase: "3"
 slug: "baseline-rules-and-ci-gate"
 status: validated
-nyquist_compliant: false
+nyquist_compliant: true
 wave_0_complete: false
 created: "2026-09-07"
 ---
@@ -107,12 +107,32 @@ A contract that lists only what passes is not a contract. Two risks are structur
 
 ## Validation Sign-Off
 
-- [ ] All tasks have an automated verify or a Wave 0 dependency.
-- [ ] Sampling continuity: no 3 consecutive tasks without an automated verify.
-- [ ] Wave 0 covers every missing reference.
-- [ ] No watch-mode flags.
-- [ ] Feedback latency measured.
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have an automated verify or a Wave 0 dependency. 12 of 12 tasks, 92 automated commands.
+- [x] Sampling continuity: no 3 consecutive tasks without an automated verify. Cannot fail; all 12 carry one.
+- [x] Wave 0 covers every missing reference. Every crate this phase names is created by it.
+- [x] No watch-mode flags. Zero matches for watch, nodemon, playwright, cypress, selenium.
+- [ ] Feedback latency measured. Not done. It needs one green run of a suite that does not exist yet.
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending. The boxes above are checked when the plans exist and
-the checks run against them, not before.
+**Approval:** approved 2026-09-07, on the measured checks above.
+
+## What the orchestrator measured, and where the reports overstate
+
+The planner and the plan-checker both state that every `<fails_when>` treats
+`0 passed` as a failure. Measured: 35 of 92 do.
+
+The claim is loose but its substance holds. A `0 passed` guard catches one
+failure only: a filtered command whose filter selects nothing and exits 0,
+which is the defect phase 2 shipped. Of the 55 `cargo test` commands, 29 carry
+a name filter, and all 29 are guarded. The other 26 run a whole workspace, a
+whole package or a whole test target, where an empty selection is not a
+reachable state and the guard would be noise.
+
+Also measured, against the live tree, before execution:
+
+- 92 automated commands, of which **0** use `--exact`.
+- **0** entries under `crates/chrys-core/` in any plan's `files_modified`.
+- Each of the four plans asserts the engine tree object id
+  `c97a6fb778c4b1373e5c4dc563481cc18e4c98c0`, twelve times each.
+- `grep -rn "Frame {" crates/chrys-core` reports 45 occurrences in 13 files,
+  which is the measured reason a new `Frame` field was rejected.
