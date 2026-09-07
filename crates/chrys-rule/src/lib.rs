@@ -82,9 +82,14 @@ struct RuleDocument {
 }
 
 /// A scope names exactly one of two things a rule answers to. There is no
-/// third variant and no `Option`, so a rule with no scope cannot be
-/// represented at all: an unscoped rule is refused at parse time, at the
-/// type level, not by a lint (D-01).
+/// third variant and no `Option`, so an unscoped rule cannot be
+/// represented as a `Scope` value at all: `Scope` is the type this crate
+/// hands to the evaluator. The deserialised row this value is built from,
+/// `RuleRow`, is more permissive: `region` and `mask` are both `Option`
+/// fields there, and a document naming neither parses without complaint.
+/// `validate_row` is the one place that converts a permissive `RuleRow`
+/// into this guarantee, refusing an unscoped rule before any comparison
+/// runs (D-01).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Scope {
     /// A named region: matched against a hint already present on the
