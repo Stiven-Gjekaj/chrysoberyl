@@ -1,0 +1,29 @@
+#!/bin/sh
+# Remove a trailer that names the tool which wrote the commit.
+#
+# A commit shows that a human read the code. That human answers questions
+# about the code six months later. A tool cannot do this, so no tool puts
+# its name in the message.
+#
+# This hook removes the line, so no person must remove it by hand. An
+# agent that adds the trailer on every commit cannot put that trailer in
+# the history while this hook runs.
+#
+# Turn the hook on for a clone with:
+#   git config core.hooksPath .githooks
+
+message_file="$1"
+temporary_file="${message_file}.strip"
+
+grep -v -iE '^(Claude-Session|Co-Authored-By|Generated-With|Co-Developed-By):' \
+    "$message_file" > "$temporary_file"
+
+# Remove the blank lines that the deleted trailer block leaves at the end.
+awk 'BEGIN { count = 0 }
+     { lines[count++] = $0 }
+     END {
+         while (count > 0 && lines[count - 1] == "") { count-- }
+         for (i = 0; i < count; i++) { print lines[i] }
+     }' "$temporary_file" > "$message_file"
+
+rm -f "$temporary_file"
