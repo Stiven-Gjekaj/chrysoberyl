@@ -115,6 +115,7 @@ impossible to write, so the general engine is the only engine that can exist.
 | Freeze the architecture, stage the formats | MiruScriptX shipped a tree walker first and replaced it in v0.5 once golden tests froze the behaviour. | — Pending |
 | Core crate and CLI first, window second | A face that needs a tty cannot be tested in CI or by an agent. mandible §3.6 already paid for this. | — Pending |
 | Repository is private until asked otherwise | Nothing goes to a remote until the author asks. | — Pending |
+| Alpha is part of what "changed" means | A pair that differs only in alpha reported identical. The engine's own decode digest saw the difference its verdict denied. Alpha is in the pixel format the engine reads, so it is in the comparison. | — Decided 2026-09-07 |
 
 ## Open Question
 
@@ -140,4 +141,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with the current state.
 
 ---
-*Last updated: 2026-09-06 after initialization*
+*Last updated: 2026-09-07 after the phase 1 alpha decision*

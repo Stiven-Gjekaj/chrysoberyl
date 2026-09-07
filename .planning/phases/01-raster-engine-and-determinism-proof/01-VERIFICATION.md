@@ -87,8 +87,12 @@ gaps:
         issue: "label_regions' foreground test (lines 159-173) reads residual.samples[idx], [idx+1], [idx+2] only — R, G, B — never the alpha byte, so even an undiscarded alpha residual would not be seen."
       - path: "crates/chrys-core/src/sequence.rs"
         issue: "compare_pair has no raw-byte-equality shortcut and reports Verdict::Identical exactly when label_regions returns zero regions (lines 32-85), so the RGB-only residual is the sole basis for the identical verdict."
+    decision: >
+      Stiven chose the first branch on 2026-09-07: include alpha. Alpha is part
+      of what "changed" means. The second branch, scoping alpha out behind a
+      guard, is rejected and must not be planned.
     missing:
-      - "Either extend difference_image and label_regions' foreground test to include the alpha channel (the code review's suggested fix: difference alpha too, and let the magnitude test consider r.max(g).max(b).max(a)), or, if alpha is deliberately out of scope for phase 1, make that an explicit, tested, documented decision on Frame/difference_image/compare_pair, and add a guard that fails loudly (or reports a distinct, non-identical verdict) when RGB channels agree but raw frame bytes do not."
+      - "Extend difference_image to difference all four channels, and let label_regions' foreground magnitude test consider alpha alongside R, G and B."
       - "A test pair whose RGB is pixel-identical and whose alpha differs, asserting the verdict is not Identical (or is an explicit, named refusal/limitation), added to crates/chrys-core/tests/classify.rs or crates/chrys-cli/tests/."
 ---
 
