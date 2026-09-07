@@ -112,3 +112,52 @@ fn a_manifest_digest_that_disagrees_with_its_file_fails_the_run() {
         "stderr does not name the digest the stored file produces: {stderr}"
     );
 }
+
+#[test]
+fn a_baseline_that_was_never_accepted_fails_loudly() {
+    let store = TempStore::new("never-accepted");
+    let root = repo_root();
+
+    let compare_output = Command::new(env!("CARGO_BIN_EXE_chrys"))
+        .arg("compare")
+        .arg("--baseline")
+        .arg("never-accepted")
+        .arg("--store")
+        .arg(&store.root)
+        .arg(root.join("tests/golden/pair-01/candidate.png"))
+        .output()
+        .expect("the chrys binary runs");
+
+    assert!(
+        !compare_output.status.success(),
+        "a comparison against a name nothing accepted must fail, not silently accept it"
+    );
+    let stderr = String::from_utf8_lossy(&compare_output.stderr);
+    assert!(
+        stderr.contains("never-accepted"),
+        "stderr does not name the baseline: {stderr}"
+    );
+    assert!(
+        stderr.contains(&store.root.display().to_string()),
+        "stderr does not name the store root: {stderr}"
+    );
+    assert!(
+        !store.root.exists(),
+        "resolve must write nothing: a failed comparison must not create the store directory"
+    );
+}
+
+#[test]
+fn accept_help_states_that_an_accept_is_a_statement() {
+    let output = Command::new(env!("CARGO_BIN_EXE_chrys"))
+        .arg("accept")
+        .arg("--help")
+        .output()
+        .expect("the chrys binary runs");
+    assert!(output.status.success(), "accept --help must exit 0");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("statement"),
+        "accept --help does not say plainly that an accept is a statement: {stdout}"
+    );
+}
