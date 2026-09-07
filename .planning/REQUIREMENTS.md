@@ -81,11 +81,11 @@ release. See ROADMAP.md for the order.
 ### Command Line and CI
 
 - [x] **CLI-01**: The tool exits non-zero when a rule fails
-- [ ] **CLI-02**: The tool writes a report artifact that names each change by
+- [x] **CLI-02**: The tool writes a report artifact that names each change by
       kind, region and size
 - [x] **CLI-03**: The tool compares two paths given on the command line and
       prints the verdict
-- [ ] **CLI-04**: Every decode call sets an explicit memory limit, so a
+- [x] **CLI-04**: Every decode call sets an explicit memory limit, so a
       malformed input fails instead of exhausting memory
 
 ### Native Window
