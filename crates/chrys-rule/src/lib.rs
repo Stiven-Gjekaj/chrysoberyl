@@ -88,9 +88,11 @@ pub enum Scope {
     /// A named region: matched against a hint already present on the
     /// compared frame.
     Region(String),
-    /// A mask image: the tolerance area its own pixels name. Not yet
-    /// decoded by this plan; a later plan fills in the pixels this
-    /// variant's path names.
+    /// A mask image: the tolerance area its own pixels name. The path
+    /// resolves inside the rule file's own directory and never outside
+    /// it, and `mask::load_mask` decodes it through the same guarded
+    /// entry point every other decode in this project uses. A pixel
+    /// tolerates when it is white and opaque, never white alone.
     Mask(PathBuf),
 }
 
