@@ -255,6 +255,18 @@ pub enum RuleError {
     /// tried to open.
     #[error("cannot read mask {path}: {message}")]
     MaskDecode { path: PathBuf, message: String },
+    /// A `Scope::Mask` rule named a path that leaves `rule_dir`, the rule
+    /// file's own directory: an absolute path, a path holding a
+    /// parent-directory component, or a path that reaches outside through
+    /// a symbolic link (T-03-08). Refused before any byte of the named
+    /// path is read.
+    #[error(
+        "{mask_path} leaves {rule_dir}, the rule file's own directory; a mask path must resolve inside it"
+    )]
+    MaskPathEscapesDirectory {
+        rule_dir: PathBuf,
+        mask_path: PathBuf,
+    },
     /// A mask-scoped rule's own mask does not match the size of the frame
     /// it is being applied against. Refused rather than scaled, cropped or
     /// padded to fit (T-03-11).
@@ -318,7 +330,7 @@ pub fn load_rules(rule_path: &Path) -> Result<LoadedRules, RuleError> {
             if masks.contains_key(mask_path) {
                 continue;
             }
-            let resolved = rule_dir.join(mask_path);
+            let resolved = mask::resolve_mask_path(rule_dir, mask_path)?;
             let decoded =
                 mask::load_mask(&resolved, &chrys_source_raster::DecodeLimits::default())?;
             masks.insert(mask_path.clone(), decoded);

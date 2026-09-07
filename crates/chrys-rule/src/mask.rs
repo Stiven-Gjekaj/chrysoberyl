@@ -1,4 +1,6 @@
-//! The mask image loader: the white-and-opaque membership rule (D-02).
+//! The mask image loader: the white-and-opaque membership rule (D-02), and
+//! the path-traversal refusal that keeps the one file-path field this
+//! schema holds from reaching outside the rule file's own directory.
 //!
 //! `load_mask` calls `chrys_source_raster::decode::decode_guarded` and
 //! `chrys_source_raster::normalize::normalize_to_rgba8` and opens no
@@ -6,7 +8,7 @@
 //! point every other raster decode in this project already uses, with the
 //! same memory limit (CLI-04).
 
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
 use crate::RuleError;
 
@@ -129,6 +131,65 @@ pub fn load_mask(
         width,
         height,
     })
+}
+
+/// Resolve `mask_path` (a `Scope::Mask` rule's own, as-written path)
+/// against `rule_dir` (the rule file's own directory), refusing a path
+/// that leaves `rule_dir`, and return the resolved path otherwise.
+///
+/// A rule file is structured input read as data, and after this plan it
+/// holds a file path: the one field in this schema that reaches outside
+/// the document. `03-VALIDATION.md` states the rule this function
+/// enforces: a mask resolves relative to the rule file's own directory and
+/// must not escape it, the same convention `hints.rs` already uses for a
+/// sidecar.
+///
+/// Two checks, not one, and both of them, run in this order:
+///
+/// 1. **Lexical.** Refuse `mask_path` outright when it is absolute or
+///    holds any parent-directory (`..`) component. This check runs before
+///    the file system is touched at all, which is what makes a hostile
+///    path cost nothing: no byte of any file is read.
+/// 2. **Canonical.** Resolve `rule_dir` and the joined path to their
+///    canonical form and refuse when the mask's canonical path does not
+///    sit inside the directory's canonical path. The lexical check alone
+///    cannot see a symbolic link that points outside `rule_dir`; this one
+///    can, the same defence-in-depth pairing phase 1 recorded for a
+///    source-level guard and one that depends on the environment.
+///
+/// Neither check falls back to reading the file, silently drops the rule,
+/// or canonicalizes first and asks afterwards (T-03-08).
+pub(crate) fn resolve_mask_path(rule_dir: &Path, mask_path: &Path) -> Result<PathBuf, RuleError> {
+    if mask_path.is_absolute()
+        || mask_path
+            .components()
+            .any(|component| component == Component::ParentDir)
+    {
+        return Err(RuleError::MaskPathEscapesDirectory {
+            rule_dir: rule_dir.to_path_buf(),
+            mask_path: mask_path.to_path_buf(),
+        });
+    }
+
+    let joined = rule_dir.join(mask_path);
+
+    let canonical_dir = rule_dir.canonicalize().map_err(|source| RuleError::Io {
+        path: rule_dir.to_path_buf(),
+        source,
+    })?;
+    let canonical_mask = joined.canonicalize().map_err(|source| RuleError::Io {
+        path: joined.clone(),
+        source,
+    })?;
+
+    if !canonical_mask.starts_with(&canonical_dir) {
+        return Err(RuleError::MaskPathEscapesDirectory {
+            rule_dir: rule_dir.to_path_buf(),
+            mask_path: mask_path.to_path_buf(),
+        });
+    }
+
+    Ok(joined)
 }
 
 #[cfg(test)]
