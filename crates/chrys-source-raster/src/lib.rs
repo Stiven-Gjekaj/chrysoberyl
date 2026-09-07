@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 use chrys_source::{Frame, Source};
 
 pub mod decode;
+pub mod hints;
 pub mod normalize;
 
 /// Resource limits applied to a decode, so a crafted file cannot force an
@@ -117,6 +118,26 @@ pub enum RasterError {
         /// The path with the unsupported format.
         path: PathBuf,
     },
+    /// The `<stem>.hints.toml` sidecar was read, but its bytes did not
+    /// parse as a well-formed hints document.
+    #[error("cannot parse {path}: {message}")]
+    MalformedHints {
+        /// The sidecar path that failed to parse.
+        path: PathBuf,
+        /// The parser's own error message, which carries its line and
+        /// column position.
+        message: String,
+    },
+    /// The sidecar named the same region more than once.
+    #[error(
+        "{path} names the region \"{name}\" more than once, but a hint is looked up by name and a name cannot answer twice"
+    )]
+    DuplicateHintName {
+        /// The sidecar that named the region twice.
+        path: PathBuf,
+        /// The region name the sidecar declared more than once.
+        name: String,
+    },
 }
 
 impl Source for RasterSource {
@@ -125,12 +146,13 @@ impl Source for RasterSource {
     fn load(&self, path: &Path) -> Result<Vec<Frame>, Self::Error> {
         let (dynamic, orientation) = decode::decode_guarded(path, &self.limits)?;
         let (pixels, width, height) = normalize::normalize_to_rgba8(dynamic, orientation);
+        let hints = hints::read_hints_sidecar(path)?;
         Ok(vec![Frame {
             pixels,
             width,
             height,
             index: 0,
-            hints: Vec::new(),
+            hints,
         }])
     }
 }

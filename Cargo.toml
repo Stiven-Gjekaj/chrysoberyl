@@ -19,6 +19,8 @@ anyhow = "=1.0.104"
 clap = { version = "=4.6.6", features = ["derive"] }
 natord = "=1.0.9"
 png = "=0.18.1"
+toml = "=1.1.5"
+serde = { version = "=1.0.229", features = ["derive"] }
 
 [workspace.lints.rust]
 rust_2018_idioms = "warn"

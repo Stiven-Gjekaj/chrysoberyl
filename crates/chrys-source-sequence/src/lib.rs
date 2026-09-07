@@ -120,6 +120,14 @@ pub enum SequenceError {
         /// The underlying decode error.
         source: RasterError,
     },
+    /// One file's own hints sidecar did not read.
+    #[error("cannot read hints for {file}: {source}")]
+    Hint {
+        /// The frame file whose sidecar failed.
+        file: PathBuf,
+        /// The underlying sidecar error.
+        source: RasterError,
+    },
 }
 
 impl Source for SequenceSource {

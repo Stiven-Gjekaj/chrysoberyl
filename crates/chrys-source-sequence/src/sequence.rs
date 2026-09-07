@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use chrys_source::Frame;
 use chrys_source_raster::DecodeLimits;
 use chrys_source_raster::decode::decode_guarded;
+use chrys_source_raster::hints::read_hints_sidecar;
 use chrys_source_raster::normalize::normalize_to_rgba8;
 
 use crate::{SequenceError, SequenceLimits};
@@ -95,12 +96,17 @@ pub(crate) fn decode_all(
             });
         }
 
+        let hints = read_hints_sidecar(path).map_err(|source| SequenceError::Hint {
+            file: path.clone(),
+            source,
+        })?;
+
         frames.push(Frame {
             pixels,
             width,
             height,
             index,
-            hints: Vec::new(),
+            hints,
         });
     }
 

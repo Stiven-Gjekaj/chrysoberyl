@@ -68,6 +68,7 @@ fn main() {
     write_format_fixtures(&base, &candidate);
     write_refusal_corpus();
     write_sequence_01();
+    write_hint_01();
 }
 
 /// Write the first committed pair, read by plan 01-03. Its bytes must not
@@ -412,6 +413,69 @@ fn write_sequence_01() {
         println!("wrote {}", base_path.display());
         println!("wrote {}", candidate_path.display());
     }
+}
+
+/// The four rectangles painted inside the named `logo` region, at
+/// `(64, 64)` sized 128x128. Byte-identical between `base.png` and
+/// `candidate.png`: four different colours and sizes, so the block match
+/// over the cropped 128x128 region (exactly sixteen 32x32 blocks) has
+/// edges in most of them to lock onto.
+const HINT_REGION_RECTS: [(u32, u32, u32, u32, Rgba<u8>); 4] = [
+    (80, 80, 24, 20, Rgba([200, 40, 40, 255])),
+    (150, 90, 28, 18, Rgba([40, 160, 40, 255])),
+    (90, 140, 20, 30, Rgba([40, 40, 200, 255])),
+    (150, 150, 22, 26, Rgba([200, 200, 40, 255])),
+];
+
+/// Write the committed `hint-01` fixture, read by `chrys-cli/tests/region_hint.rs`.
+///
+/// Both `base.hints.toml` and `candidate.hints.toml` name one region,
+/// `logo`, at `(64, 64)` sized 128x128 (`HINT_REGION_RECTS`, painted
+/// identically on both sides). Outside that region, two small rectangles
+/// are painted a different flat colour on each side: a colour change, not
+/// a shift, so no translation the engine's own registration step can find
+/// hides the difference. The whole-frame comparison therefore reports
+/// something other than `identical`, while the region-cropped comparison,
+/// over bytes that are identical between the two files, reports
+/// `identical`.
+fn write_hint_01() {
+    let mut base = RgbaImage::from_pixel(WIDTH, HEIGHT, Rgba([230, 230, 230, 255]));
+    let mut candidate = RgbaImage::from_pixel(WIDTH, HEIGHT, Rgba([230, 230, 230, 255]));
+
+    paint_rect(&mut base, 16, 16, 40, 30, Rgba([40, 90, 200, 255]));
+    paint_rect(&mut candidate, 16, 16, 40, 30, Rgba([200, 90, 40, 255]));
+    paint_rect(&mut base, 196, 196, 40, 30, Rgba([40, 90, 200, 255]));
+    paint_rect(&mut candidate, 196, 196, 40, 30, Rgba([200, 90, 40, 255]));
+
+    for &(x, y, width, height, colour) in &HINT_REGION_RECTS {
+        paint_rect(&mut base, x, y, width, height, colour);
+        paint_rect(&mut candidate, x, y, width, height, colour);
+    }
+
+    let out_dir = golden_root().join("hint-01");
+    std::fs::create_dir_all(&out_dir)
+        .unwrap_or_else(|e| panic!("create {}: {e}", out_dir.display()));
+
+    let base_path = out_dir.join("base.png");
+    let candidate_path = out_dir.join("candidate.png");
+    base.save(&base_path)
+        .unwrap_or_else(|e| panic!("write {}: {e}", base_path.display()));
+    candidate
+        .save(&candidate_path)
+        .unwrap_or_else(|e| panic!("write {}: {e}", candidate_path.display()));
+
+    let sidecar = "[[hint]]\nname = \"logo\"\nx = 64\ny = 64\nwidth = 128\nheight = 128\n";
+    let base_sidecar_path = out_dir.join("base.hints.toml");
+    let candidate_sidecar_path = out_dir.join("candidate.hints.toml");
+    std::fs::write(&base_sidecar_path, sidecar)
+        .unwrap_or_else(|e| panic!("write {}: {e}", base_sidecar_path.display()));
+    std::fs::write(&candidate_sidecar_path, sidecar)
+        .unwrap_or_else(|e| panic!("write {}: {e}", candidate_sidecar_path.display()));
+
+    println!("wrote {}", base_path.display());
+    println!("wrote {}", candidate_path.display());
+    println!("wrote {}", base_sidecar_path.display());
+    println!("wrote {}", candidate_sidecar_path.display());
 }
 
 fn golden_root() -> std::path::PathBuf {

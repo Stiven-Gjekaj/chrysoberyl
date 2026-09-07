@@ -34,6 +34,13 @@ enum Command {
         /// file.
         #[arg(long)]
         hash_only: bool,
+
+        /// Compare inside a named region only. Both the base and the
+        /// candidate frame at each index must carry a hint of this name;
+        /// each side crops to its own hint's rectangle before the
+        /// unmodified comparison runs.
+        #[arg(long)]
+        region: Option<String>,
     },
 }
 
@@ -55,7 +62,8 @@ fn run() -> anyhow::Result<ExitCode> {
             base,
             candidate,
             hash_only,
-        } => run_compare(&base, &candidate, hash_only),
+            region,
+        } => run_compare(&base, &candidate, hash_only, region.as_deref()),
     }
 }
 
@@ -63,9 +71,18 @@ fn run_compare(
     base_path: &Path,
     candidate_path: &Path,
     hash_only: bool,
+    region: Option<&str>,
 ) -> anyhow::Result<ExitCode> {
     let base_frames = frames_for(base_path)?;
     let candidate_frames = frames_for(candidate_path)?;
+
+    let (base_frames, candidate_frames) = match region {
+        Some(name) => (
+            crop_frames_to_region(&base_frames, name, base_path)?,
+            crop_frames_to_region(&candidate_frames, name, candidate_path)?,
+        ),
+        None => (base_frames, candidate_frames),
+    };
 
     let verdicts = chrys_core::compare_sequence(&base_frames, &candidate_frames)?;
 
@@ -134,6 +151,44 @@ fn verdict_rank(verdict: &chrys_core::Verdict) -> u8 {
         chrys_core::Verdict::Changed { .. } => 1,
         chrys_core::Verdict::Refused { .. } => 2,
     }
+}
+
+/// Crop every frame in `frames` to the rectangle its own hint named
+/// `region` describes, failing loudly when a frame carries no hint of that
+/// name.
+///
+/// The error names `path`, the frame's own index, and the region names
+/// that frame does carry, so a person who mistyped a region learns the
+/// available ones instead of a bare refusal.
+fn crop_frames_to_region(
+    frames: &[Frame],
+    region: &str,
+    path: &Path,
+) -> anyhow::Result<Vec<Frame>> {
+    frames
+        .iter()
+        .map(|frame| {
+            let hint = frame
+                .hints
+                .iter()
+                .find(|hint| hint.name == region)
+                .ok_or_else(|| {
+                    let available: Vec<&str> =
+                        frame.hints.iter().map(|hint| hint.name.as_str()).collect();
+                    let names = if available.is_empty() {
+                        "none".to_string()
+                    } else {
+                        available.join(", ")
+                    };
+                    anyhow::anyhow!(
+                        "{} has no region named \"{region}\" at frame {}; it names: {names}",
+                        path.display(),
+                        frame.index
+                    )
+                })?;
+            Ok(frame.crop_to_region(hint)?)
+        })
+        .collect()
 }
 
 /// Load the frames at `path`. A directory loads as a numbered frame
