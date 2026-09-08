@@ -212,7 +212,7 @@ the phase gate.
 Plans:
 **Wave 1**
 
-- [ ] 04-01-PLAN.md — Compare an SVG pair through a new adapter, with every glyph from one pinned font
+- [x] 04-01-PLAN.md — Compare an SVG pair through a new adapter, with every glyph from one pinned font
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
