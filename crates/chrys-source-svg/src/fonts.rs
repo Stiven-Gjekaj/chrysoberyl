@@ -25,9 +25,26 @@ static NOTO_SANS_REGULAR: &[u8] = include_bytes!("../fonts/NotoSans-Regular.ttf"
 /// repository committed. No path is read at run time, and this crate's
 /// `resvg` dependency carries no `system-fonts` feature, so the host
 /// machine's own font database is never reachable from here at all.
+///
+/// `usvg`'s own font query appends the database's generic "serif" family
+/// as its last fallback candidate, checked only after every family a
+/// `font-family` attribute named has failed to resolve. A database with
+/// no generic family mapping of its own resolves that fallback to
+/// nothing, so a `<text>` naming a family this one-font database does
+/// not carry would render no glyph at all rather than the pinned one.
+/// Every generic family this database can carry is mapped to the pinned
+/// font's own name here, so every one of `usvg`'s fallback paths, not
+/// only the no-`font-family`-at-all path `usvg::Options::font_family`
+/// covers, still lands on this repository's one committed font.
 pub fn pinned_fontdb() -> fontdb::Database {
     let mut db = fontdb::Database::new();
     db.load_font_data(NOTO_SANS_REGULAR.to_vec());
+    let family = pinned_family_name(&db);
+    db.set_serif_family(family.clone());
+    db.set_sans_serif_family(family.clone());
+    db.set_cursive_family(family.clone());
+    db.set_fantasy_family(family.clone());
+    db.set_monospace_family(family);
     db
 }
 

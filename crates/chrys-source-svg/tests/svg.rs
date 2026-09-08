@@ -150,3 +150,106 @@ fn alpha_is_straight_not_premultiplied() {
         opaque[3]
     );
 }
+
+/// The family name this crate falls back to is read out of the pinned
+/// database, not typed a second time as a string literal: a literal
+/// typed twice is two things that can drift, and the point of this
+/// assertion is that they cannot.
+#[test]
+fn the_pinned_database_holds_one_face_whose_family_the_options_name() {
+    let db = chrys_source_svg::fonts::pinned_fontdb();
+    assert_eq!(
+        db.len(),
+        1,
+        "the pinned database must hold exactly one face"
+    );
+
+    let face = db
+        .faces()
+        .next()
+        .expect("the pinned database holds exactly one face");
+    let declared_family = &face
+        .families
+        .first()
+        .expect("a TrueType face names at least one family")
+        .0;
+
+    let options_family = chrys_source_svg::fonts::pinned_family_name(&db);
+    assert_eq!(
+        *declared_family, options_family,
+        "the face's own declared family must equal the name the crate sets as the fallback family"
+    );
+}
+
+/// Renders `svg` (a `{}` placeholder carries the text element's
+/// `font-family` attribute, empty when the caller passes no family at
+/// all) to a temporary file, loads it through `SvgSource`, and returns
+/// the decoded frame.
+fn render_text_document(font_family_attr: &str) -> chrys_source::Frame {
+    let svg = format!(
+        r##"<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40">
+  <text x="5" y="28"{font_family_attr} font-size="28" fill="#000000">Chrys</text>
+</svg>
+"##
+    );
+
+    let dir = std::env::temp_dir();
+    let path = dir.join(format!(
+        "chrys-source-svg-fallback-test-{}.svg",
+        font_family_attr.len()
+    ));
+    std::fs::write(&path, svg).expect("write the temporary SVG");
+
+    let source = SvgSource::new();
+    let result = source
+        .load(&path)
+        .expect("the temporary SVG decodes")
+        .into_iter()
+        .next()
+        .expect("the temporary SVG decodes to one frame");
+    std::fs::remove_file(&path).ok();
+    result
+}
+
+/// DET-05's rendering assertion: a text node naming a family this
+/// database certainly does not carry, and one carrying no family
+/// attribute at all, must render byte-identical to one naming the pinned
+/// family. Equality is only reachable when the host font database was
+/// never consulted; on a machine that happens to have the unmatched
+/// family installed, a build that could reach it would render that
+/// document differently from the other two.
+#[test]
+fn an_unmatched_font_family_falls_back_to_the_pinned_font() {
+    let pinned = render_text_document(" font-family=\"Noto Sans\"");
+    // "Arial" is a family this crate's one-font database certainly does
+    // not carry, and one many developer machines certainly do.
+    let unmatched = render_text_document(" font-family=\"Arial\"");
+    let unspecified = render_text_document("");
+
+    assert_eq!(
+        pinned.pixels, unmatched.pixels,
+        "a document naming a family the database does not carry must render identically to one \
+         naming the pinned family"
+    );
+    assert_eq!(
+        pinned.pixels, unspecified.pixels,
+        "a document naming no family at all must render identically to one naming the pinned \
+         family"
+    );
+
+    // The floor that stops this test passing for the wrong reason: all
+    // three could agree perfectly by all rendering nothing. The floor
+    // below was set from a measured run: rendering "Chrys" at font-size
+    // 28 in this fixture produced 571 non-transparent pixels; 100 is
+    // comfortably below that measurement and comfortably above zero.
+    let non_transparent = pinned
+        .pixels
+        .chunks_exact(4)
+        .filter(|pixel| pixel[3] != 0)
+        .count();
+    assert!(
+        non_transparent > 100,
+        "expected a real glyph area, not a blank canvas; measured {non_transparent} \
+         non-transparent pixels"
+    );
+}
