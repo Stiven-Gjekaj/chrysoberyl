@@ -207,7 +207,31 @@ the phase gate.
   2. Text rasterization uses a font set pinned in the repository. The tool never reads the host font database.
   3. A cross-OS golden-hash test on a text-bearing SVG fixture passes on Linux, macOS, and Windows. This test is the phase's exit gate for the font and curve determinism claim, and it is the template every later format-specific gate reuses.
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 04-01-PLAN.md — Compare an SVG pair through a new adapter, with every glyph from one pinned font
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 04-02-PLAN.md — Bound what the adapter accepts, and prove the host font capability is not compiled in
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 04-03-PLAN.md — Hash the SVG fixture on six runners, and settle or withdraw the determinism claim
+
+**Note**: the waves are serial because each one owns files the next one
+reads. Plan 04-01 owns the new crate, the CLI dispatch and the fixture;
+plan 04-02 adds tests and guards over that crate; plan 04-03 owns the
+workflow and runs the phase gate. Every plan checks that
+`crates/chrys-core`'s tree object id is still
+`c97a6fb778c4b1373e5c4dc563481cc18e4c98c0`, which has now held for three
+phases. Success criterion 3 is treated as a falsification test: the
+matrix result is recorded whatever it says, and if it disagrees after the
+documented SIMD fallback, the claim is withdrawn in writing rather than
+shipped.
 
 ### Phase 5: PDF page comparison
 
@@ -281,7 +305,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 1. Raster engine and determinism proof | 9/9 | Complete    | 2026-09-07 |
 | 2. Source trait and a second format | 5/5 | Complete    | 2026-09-07 |
 | 3. Baseline, rules and CI gate | 5/5 | Complete    | 2026-09-08 |
-| 4. SVG rasterization | 0/TBD | Not started | - |
+| 4. SVG rasterization | 0/3 | Planned | - |
 | 5. PDF page comparison | 0/TBD | Not started | - |
 | 6. wgpu mirror and native window | 0/TBD | Not started | - |
 | 7. Video comparison | 0/TBD | Not started | - |
