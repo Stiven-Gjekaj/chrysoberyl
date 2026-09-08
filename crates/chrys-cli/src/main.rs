@@ -12,6 +12,7 @@ use chrys_source::{Frame, Source};
 use chrys_source_animation::AnimationSource;
 use chrys_source_raster::RasterSource;
 use chrys_source_sequence::SequenceSource;
+use chrys_source_svg::SvgSource;
 use clap::{Parser, Subcommand};
 
 mod report;
@@ -648,15 +649,19 @@ fn translate_region(
 /// Load the frames at `path`, each paired with the name of the file it
 /// came from, through `Source::load_named`. A directory loads as a
 /// numbered frame sequence through `SequenceSource`, each frame beside
-/// its own file's name. A file sniffed as a GIF, an APNG or an animated
-/// WebP loads through `AnimationSource`, every frame beside that
-/// container's own name. Any other file loads as a single raster image
-/// through `RasterSource`, that one frame beside its own file's name.
-/// The three-way dispatch itself is unchanged from before this crate
-/// learned a frame's own name.
+/// its own file's name. A file whose content sniffs as an SVG document
+/// loads through `SvgSource`, checked before the animation sniff because
+/// it is the cheaper, textual check. A file sniffed as a GIF, an APNG or
+/// an animated WebP loads through `AnimationSource`, every frame beside
+/// that container's own name. Any other file loads as a single raster
+/// image through `RasterSource`, that one frame beside its own file's
+/// name. Every branch decides on the file's content, never its
+/// extension.
 fn named_frames_for(path: &Path) -> anyhow::Result<(Vec<String>, Vec<Frame>)> {
     let named = if path.is_dir() {
         SequenceSource::new().load_named(path)?
+    } else if chrys_source_svg::looks_like_svg(path)? {
+        SvgSource::new().load_named(path)?
     } else if chrys_source_animation::sniff::is_animation(path)? {
         AnimationSource::new().load_named(path)?
     } else {

@@ -63,11 +63,11 @@ fn every_crate_in_the_workspace_forbids_unsafe_code() {
         }
     }
 
-    // A guard that checks nothing passes. The workspace has eight crates;
+    // A guard that checks nothing passes. The workspace has nine crates;
     // fewer than that means this walk stopped finding them, which is its
     // own defect and must not read as a pass.
     assert!(
-        checked >= 8,
+        checked >= 9,
         "the guard found only {checked} crate roots under {}, so it is not checking what it claims",
         crates_dir.display()
     );

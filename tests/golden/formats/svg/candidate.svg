@@ -1,0 +1,20 @@
+<!-- keep this header short: the sniff reads only the first 1024 bytes -->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="band" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#003366"/>
+      <stop offset="1" stop-color="#66ccff"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="256" height="256" fill="#ffffff"/>
+  <rect x="16" y="16" width="48" height="48" fill="#ff0000"/>
+  <rect x="192" y="16" width="48" height="48" fill="#cc00cc"/>
+  <rect x="16" y="192" width="48" height="48" fill="#0000ff"/>
+  <rect x="192" y="192" width="48" height="48" fill="#ffcc00"/>
+  <rect x="96" y="96" width="64" height="16" fill="url(#band)"/>
+  <path d="M 40 140 C 70 100, 130 180, 160 140 S 220 100, 240 140"
+        fill="none" stroke="#663399" stroke-width="6"/>
+  <rect x="96" y="150" width="64" height="24" fill="#ff00ff" fill-opacity="0.5"/>
+  <text x="20" y="120" font-family="Noto Sans" font-size="18" fill="#111111">Chrysoberyl</text>
+  <text x="20" y="150" font-size="18" fill="#111111">Rasterized</text>
+</svg>
