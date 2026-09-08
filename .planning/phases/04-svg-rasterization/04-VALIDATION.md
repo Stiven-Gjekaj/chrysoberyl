@@ -2,7 +2,7 @@
 phase: "4"
 slug: "svg-rasterization"
 status: validated
-nyquist_compliant: false
+nyquist_compliant: true
 wave_0_complete: false
 created: "2026-09-08"
 ---
@@ -89,12 +89,23 @@ A green matrix on one machine is not evidence here. Only the six runners are.
 
 ## Validation Sign-Off
 
-- [ ] All tasks have an automated verify or a Wave 0 dependency.
-- [ ] Sampling continuity: no 3 consecutive tasks without an automated verify.
-- [ ] Wave 0 covers every missing reference.
-- [ ] No watch-mode flags.
-- [ ] Feedback latency measured.
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have an automated verify or a Wave 0 dependency. 8 of 8 tasks, 68 automated commands.
+- [x] Sampling continuity: no 3 consecutive tasks without an automated verify. Maximum 2 per wave.
+- [x] Wave 0 covers every missing reference.
+- [x] No watch-mode flags. Zero matches.
+- [ ] Feedback latency measured. Not done. It needs a green run of a suite that does not exist yet.
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending. The boxes are checked when the plans exist and the
-checks run against them, not before.
+**Approval:** approved 2026-09-08, on the measured checks above.
+
+## What the orchestrator measured before execution
+
+Independently, against the plan text, not taken from the checker:
+
+- 68 automated commands, 68 failure conditions, one to one.
+- **0** of them use `--exact`.
+- **14** carry a name filter, where a typo silently selects nothing and exits
+  0. All 14 guard against `0 passed`. That is the defect phase 2 shipped,
+  closed here by construction.
+- **0** entries under `crates/chrys-core/` in any plan's `files_modified`.
+- The engine tree object id is asserted 25 times across the three plans.
