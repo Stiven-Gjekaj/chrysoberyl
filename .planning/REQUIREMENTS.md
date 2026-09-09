@@ -36,7 +36,7 @@ release. See ROADMAP.md for the order.
 - [x] **DET-03**: CI proves DET-01 and DET-02 on every commit, with a hash of
       raw RGBA8 output and never of a re-encoded file
 - [x] **DET-04**: No pixel that enters a comparison is produced by a GPU
-- [ ] **DET-05**: Text rasterization uses a font set pinned in the repository,
+- [x] **DET-05**: Text rasterization uses a font set pinned in the repository,
       never the host font database
 - [x] **DET-06**: The comparison path calls no platform transcendental
       function, and the build disables floating point contraction on that path
@@ -47,7 +47,7 @@ release. See ROADMAP.md for the order.
 - [x] **SRC-02**: A numbered frame sequence pair is compared frame by frame
 - [x] **SRC-03**: An animation pair is compared frame by frame (GIF, APNG,
       animated WebP)
-- [ ] **SRC-04**: An SVG pair is rasterized on the CPU and compared
+- [x] **SRC-04**: An SVG pair is rasterized on the CPU and compared
 - [ ] **SRC-05**: A PDF page pair is compared, behind a Cargo feature that is
       off by default
 - [ ] **SRC-06**: A video pair is compared, paired by presentation timestamp
@@ -164,8 +164,8 @@ release. See ROADMAP.md for the order.
 | CLI-02 | Phase 3 | Complete |
 | CLI-03 | Phase 3 | Complete |
 | CLI-04 | Phase 3 | Complete |
-| SRC-04 | Phase 4 | Pending |
-| DET-05 | Phase 4 | Pending |
+| SRC-04 | Phase 4 | Complete |
+| DET-05 | Phase 4 | Complete |
 | SRC-05 | Phase 5 | Pending |
 | VIEW-01 | Phase 6 | Pending |
 | VIEW-02 | Phase 6 | Pending |
