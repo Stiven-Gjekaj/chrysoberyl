@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 
 use chrys_source::Source;
-use chrys_source_svg::SvgSource;
+use chrys_source_svg::{SvgError, SvgLimits, SvgSource};
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -252,4 +252,130 @@ fn an_unmatched_font_family_falls_back_to_the_pinned_font() {
         "expected a real glyph area, not a blank canvas; measured {non_transparent} \
          non-transparent pixels"
     );
+}
+
+/// `SvgSource::with_limits` carrying a `max_file_bytes` below the
+/// committed fixture's own size refuses that fixture with the file-size
+/// variant, naming both the file's size and the limit.
+#[test]
+fn an_oversized_file_is_refused_before_parsing() {
+    let base_path = fixture("base.svg");
+    let actual_size = std::fs::metadata(&base_path)
+        .expect("read base.svg's own metadata")
+        .len();
+    let limit = actual_size - 1;
+    let source = SvgSource::with_limits(SvgLimits {
+        max_file_bytes: limit,
+        ..SvgLimits::default()
+    });
+
+    match source.load(&base_path) {
+        Err(SvgError::FileTooLarge {
+            size,
+            limit: reported_limit,
+            ..
+        }) => {
+            assert_eq!(
+                size, actual_size,
+                "the refusal must name the file's real size"
+            );
+            assert_eq!(
+                reported_limit, limit,
+                "the refusal must name the limit it was checked against"
+            );
+        }
+        other => panic!("expected SvgError::FileTooLarge, got {other:?}"),
+    }
+}
+
+/// The half a metadata check alone cannot prove: the bounded read, called
+/// directly, refuses more than its cap without consulting the file's own
+/// declared metadata length. A length read from metadata and a length
+/// read from the file are two measurements of two moments, and only the
+/// second bounds what this process actually allocated.
+#[test]
+fn the_bounded_read_refuses_more_than_its_cap_without_consulting_metadata() {
+    let base_path = fixture("base.svg");
+    let actual_size = std::fs::metadata(&base_path)
+        .expect("read base.svg's own metadata")
+        .len();
+
+    match chrys_source_svg::bounded_read(&base_path, actual_size - 1) {
+        Err(SvgError::FileTooLarge { .. }) => {}
+        other => panic!("expected SvgError::FileTooLarge below the file's size, got {other:?}"),
+    }
+
+    let buffer = chrys_source_svg::bounded_read(&base_path, actual_size + 1)
+        .expect("a cap above the file's size must return its whole content");
+    let expected = std::fs::read(&base_path).expect("read base.svg directly");
+    assert_eq!(
+        buffer, expected,
+        "a cap above the file's size must return the file's whole byte content"
+    );
+}
+
+/// An SVG declaring a canvas above `SvgLimits::max_width`/`max_height` is
+/// refused with the canvas variant, naming the width, the height and the
+/// limit, before any pixel buffer is allocated.
+///
+/// The declared size is built in the test itself, as a string, per
+/// AGENTS.md: build the state a test needs inside the test. 100000 was
+/// measured to produce this variant, not the parse variant `usvg` would
+/// return for a still-larger declared size; see the plan summary for the
+/// values tried.
+#[test]
+fn an_oversized_declared_canvas_is_refused() {
+    let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="100000" height="100000">
+  <rect x="0" y="0" width="10" height="10" fill="#ff0000"/>
+</svg>
+"##;
+    let dir = std::env::temp_dir();
+    let path = dir.join("chrys-source-svg-oversized-canvas-test.svg");
+    std::fs::write(&path, svg).expect("write the temporary SVG");
+
+    let source = SvgSource::new();
+    let result = source.load(&path);
+    std::fs::remove_file(&path).ok();
+
+    match result {
+        Err(SvgError::CanvasTooLarge {
+            width,
+            height,
+            max_width,
+            max_height,
+            ..
+        }) => {
+            assert_eq!(width, 100000, "the refusal must name the declared width");
+            assert_eq!(height, 100000, "the refusal must name the declared height");
+            assert_eq!(max_width, SvgLimits::default().max_width);
+            assert_eq!(max_height, SvgLimits::default().max_height);
+        }
+        other => panic!("expected SvgError::CanvasTooLarge, got {other:?}"),
+    }
+}
+
+/// The boundary case that cannot depend on how `usvg` handles a very
+/// large declared number at all: `SvgSource::with_limits` carrying a
+/// `max_width` of 1 refuses the committed 256 by 256 fixture with the
+/// same canvas variant.
+#[test]
+fn a_max_width_of_one_refuses_the_committed_fixture() {
+    let source = SvgSource::with_limits(SvgLimits {
+        max_width: 1,
+        ..SvgLimits::default()
+    });
+
+    match source.load(&fixture("base.svg")) {
+        Err(SvgError::CanvasTooLarge {
+            width,
+            height,
+            max_width,
+            ..
+        }) => {
+            assert_eq!(width, 256);
+            assert_eq!(height, 256);
+            assert_eq!(max_width, 1);
+        }
+        other => panic!("expected SvgError::CanvasTooLarge, got {other:?}"),
+    }
 }

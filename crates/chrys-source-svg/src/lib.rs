@@ -154,6 +154,42 @@ pub enum SvgError {
     },
 }
 
+/// Read `path` through a `Read::take`-bounded reader capped at
+/// `max_file_bytes`, and refuse with `SvgError::FileTooLarge` when the read
+/// itself produces more bytes than the cap allows.
+///
+/// This bound applies to what was actually read, not to a length the file
+/// merely declares about itself in its metadata: a length read from
+/// metadata and a length read from the file are two measurements of two
+/// moments, and only this one bounds what this process actually allocated
+/// (AGENTS.md: "a size is not a state"). `SvgSource::load` calls this after
+/// its own metadata check; it is a standalone function, not a private
+/// helper, so a test can call it directly and prove the bound holds even
+/// when the declared and the actual length disagree.
+pub fn bounded_read(path: &Path, max_file_bytes: u64) -> Result<Vec<u8>, SvgError> {
+    let path_buf = path.to_path_buf();
+    let mut file = File::open(path).map_err(|source| SvgError::Io {
+        path: path_buf.clone(),
+        source,
+    })?;
+    let mut buffer = Vec::new();
+    file.by_ref()
+        .take(max_file_bytes + 1)
+        .read_to_end(&mut buffer)
+        .map_err(|source| SvgError::Io {
+            path: path_buf.clone(),
+            source,
+        })?;
+    if buffer.len() as u64 > max_file_bytes {
+        return Err(SvgError::FileTooLarge {
+            path: path_buf,
+            size: buffer.len() as u64,
+            limit: max_file_bytes,
+        });
+    }
+    Ok(buffer)
+}
+
 /// Build the `usvg::Options` every load uses: the pinned font database,
 /// with the pinned family's own name set as the fallback family, so a
 /// text node naming no family, or a family this database does not carry,
@@ -195,25 +231,7 @@ impl Source for SvgSource {
         // metadata and a length read from the file are two measurements
         // of two moments, and only this one bounds what this process
         // actually allocated (AGENTS.md: a size is not a state).
-        let mut file = File::open(path).map_err(|source| SvgError::Io {
-            path: path_buf.clone(),
-            source,
-        })?;
-        let mut buffer = Vec::new();
-        file.by_ref()
-            .take(self.limits.max_file_bytes + 1)
-            .read_to_end(&mut buffer)
-            .map_err(|source| SvgError::Io {
-                path: path_buf.clone(),
-                source,
-            })?;
-        if buffer.len() as u64 > self.limits.max_file_bytes {
-            return Err(SvgError::FileTooLarge {
-                path: path_buf,
-                size: buffer.len() as u64,
-                limit: self.limits.max_file_bytes,
-            });
-        }
+        let buffer = bounded_read(path, self.limits.max_file_bytes)?;
 
         // 3. Parse.
         let options = build_options();
