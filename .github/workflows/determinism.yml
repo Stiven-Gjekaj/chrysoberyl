@@ -91,6 +91,38 @@ jobs:
           echo "== alpha-01 (gap G-01-1) ==" >> digest.txt
           cargo run -q --release -p chrys-cli -- compare tests/golden/alpha-01/base.png tests/golden/alpha-01/candidate.png --hash-only >> digest.txt
 
+          # This line is phase 4's exit gate for the font and curve
+          # determinism claim, and the template every later
+          # format-specific gate reuses.
+          #
+          # The claim is not assumed. tiny-skia ships SIMD paths for
+          # SSE2, AVX2 and NEON, enabled by default. That dispatch is
+          # resolved per target architecture at compile time, not per CPU
+          # at run time, so it cannot make two machines of the same
+          # architecture disagree the way phase 1's auto-dispatching FFT
+          # planner could. It can still, in principle, round differently
+          # between the x86-64 and AArch64 paths, and no run of this
+          # matrix against a glyph had happened before this line was
+          # added.
+          #
+          # A green run on one developer machine is not evidence for this
+          # claim. The six runner labels above are.
+          #
+          # If this line disagrees between runners, disable tiny-skia's
+          # SIMD feature and measure again. That is the documented
+          # fallback, and it is the same order of operations phase 1 used
+          # for the fused multiply-add question: trust the stated
+          # guarantee as the starting hypothesis, let this job falsify
+          # it, and act on the result rather than on the claim.
+          #
+          # If it still disagrees after that, write the finding down and
+          # withdraw the claim rather than ship it, which is what this
+          # project already did for lossy animated WebP. Withdrawing is a
+          # decision for a person, not something this job or a later
+          # automated change may take by weakening what is compared.
+          echo "== tests/golden/formats/svg ==" >> digest.txt
+          cargo run -q --release -p chrys-cli -- compare tests/golden/formats/svg/base.svg tests/golden/formats/svg/candidate.svg --hash-only >> digest.txt
+
       - name: Upload the digest report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
