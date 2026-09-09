@@ -207,7 +207,7 @@ the phase gate.
   2. Text rasterization uses a font set pinned in the repository. The tool never reads the host font database.
   3. A cross-OS golden-hash test on a text-bearing SVG fixture passes on Linux, macOS, and Windows. This test is the phase's exit gate for the font and curve determinism claim, and it is the template every later format-specific gate reuses.
 
-**Plans**: 3 plans
+**Plans**: 2/3 plans executed
 
 Plans:
 **Wave 1**
@@ -216,7 +216,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 04-02-PLAN.md — Bound what the adapter accepts, and prove the host font capability is not compiled in
+- [x] 04-02-PLAN.md — Bound what the adapter accepts, and prove the host font capability is not compiled in
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -305,7 +305,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 1. Raster engine and determinism proof | 9/9 | Complete    | 2026-09-07 |
 | 2. Source trait and a second format | 5/5 | Complete    | 2026-09-07 |
 | 3. Baseline, rules and CI gate | 5/5 | Complete    | 2026-09-08 |
-| 4. SVG rasterization | 0/3 | Planned | - |
+| 4. SVG rasterization | 2/3 | In Progress|  |
 | 5. PDF page comparison | 0/TBD | Not started | - |
 | 6. wgpu mirror and native window | 0/TBD | Not started | - |
 | 7. Video comparison | 0/TBD | Not started | - |
