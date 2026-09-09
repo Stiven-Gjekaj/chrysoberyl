@@ -1,25 +1,31 @@
 //! DET-05's compile-time half: `resvg` builds with only its `text`
-//! feature, so the host-font-database reader it can otherwise compile in
-//! is absent from this binary rather than merely uncalled.
+//! feature, and no crate on the SVG-rasterization path reaches
+//! `chrys-core`'s own dependency graph. The host-font-database reader
+//! `resvg`'s default features would otherwise compile in is absent from
+//! this binary rather than merely uncalled, and no path from the engine
+//! to that reader, or to any other SVG-path crate, exists at all.
 //!
 //! **Why this crate, and not `chrys-core`.** `chrys-cli` already depends
 //! on every other crate this workspace ships, and already hosts
 //! `unsafe_guard.rs` and `decode_limits_guard.rs` for the same reason: it
 //! is the one crate that can read every other crate's own boundary
-//! without editing the engine itself. `crates/chrys-core`'s own tree
+//! without editing the engine itself. `crates/chrys-core/tests/
+//! determinism.rs` already holds `DENIED_DEPENDENCY_CRATES`, and this
+//! module's second test is, in spirit, one more entry on that same list;
+//! it cannot be written there, because `crates/chrys-core`'s own tree
 //! object id (`c97a6fb778c4b1373e5c4dc563481cc18e4c98c0`, read at commit
 //! `199477d`, and covering `crates/chrys-core/tests/` as well as its
-//! `src/`) must not move this phase, so a guard cannot be added to
-//! `crates/chrys-core/tests/determinism.rs` even where it would
-//! otherwise belong.
+//! `src/`) must not move this phase.
 //!
-//! **Two independent layers.** A manifest line says what was asked for;
-//! the resolved `cargo tree` graph says what was actually built. Feature
-//! unification means a second crate elsewhere in this workspace could
-//! turn a feature back on without the manifest line this test also reads
-//! ever changing, so this test checks both, and neither layer skips when
-//! its own command cannot run: a guard that skips when its own command
-//! is missing is a guard that always passes.
+//! **Two independent layers, in each test.** A manifest line, or a
+//! denied-crate list, says what was asked for; the resolved `cargo tree`
+//! graph says what was actually built. Feature unification, or a
+//! transitive dependency, means a second crate elsewhere in this
+//! workspace could reach a forbidden capability without either
+//! manifest-level check here ever changing, so both tests below read the
+//! resolved graph, and neither skips when its own command cannot run: a
+//! guard that skips when its own command is missing is a guard that
+//! always passes.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -129,5 +135,62 @@ fn only_the_text_feature_of_resvg_is_enabled() {
          element at all",
         manifest_path.display(),
         resvg_line.trim()
+    );
+}
+
+/// The crate name a `cargo tree` output line names, skipping the
+/// tree-drawing characters and indentation `cargo tree` prints before it.
+/// The same technique `crates/chrys-core/tests/determinism.rs`'s own
+/// `crate_name_in_tree_line` uses; duplicated here for the same reason
+/// this file's own header names: that file sits inside the subtree this
+/// phase may not edit.
+fn crate_name_in_tree_line(line: &str) -> &str {
+    let start = line
+        .find(|c: char| c.is_ascii_alphanumeric())
+        .unwrap_or(line.len());
+    line[start..].split_whitespace().next().unwrap_or("")
+}
+
+/// The seven crates on the SVG-rasterization path this workspace's
+/// dependency tree may name, but `chrys-core`'s own graph never may.
+const SVG_PATH_CRATES: &[&str] = &[
+    "resvg",
+    "usvg",
+    "tiny-skia",
+    "fontdb",
+    "rustybuzz",
+    "ttf-parser",
+    "roxmltree",
+];
+
+#[test]
+fn no_svg_crate_enters_chrys_cores_dependency_graph() {
+    let tree = run_cargo(&["tree", "-p", "chrys-core", "-e", "normal"]);
+
+    let mut offenders: Vec<&str> = tree
+        .lines()
+        .map(crate_name_in_tree_line)
+        .filter(|name| SVG_PATH_CRATES.contains(name))
+        .collect();
+    offenders.sort_unstable();
+    offenders.dedup();
+
+    assert!(
+        offenders.is_empty(),
+        "chrys-core's own dependency graph names a crate on the SVG-rasterization path (see this \
+         test file's own SVG_PATH_CRATES doc comment). Offending crate(s): {}. The tree below \
+         shows the path that pulled each one in:\n{}",
+        offenders.join(", "),
+        tree
+    );
+
+    let names_chrys_core = tree
+        .lines()
+        .map(crate_name_in_tree_line)
+        .any(|name| name == "chrys-core");
+    assert!(
+        names_chrys_core,
+        "the tree this test read never names chrys-core itself, so an empty or unrelated \
+         output could otherwise read as a pass:\n{tree}"
     );
 }
