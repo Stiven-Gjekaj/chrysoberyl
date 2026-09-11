@@ -172,9 +172,18 @@ pub fn bounded_read(path: &Path, max_file_bytes: u64) -> Result<Vec<u8>, SvgErro
         path: path_buf.clone(),
         source,
     })?;
+    // `max_file_bytes` is caller-supplied through the public `with_limits`
+    // constructor, so `max_file_bytes + 1` must not be a plain add: a
+    // caller passing `u64::MAX` (a plausible way to say "no limit") would
+    // panic in a debug build and wrap to `0` in a release build, which
+    // reads as a limit of zero bytes rather than no limit at all. Reading
+    // one byte past a cap that is already the largest `u64` cannot happen,
+    // so saturating at `u64::MAX` keeps the same "read one byte past the
+    // cap to detect an overage" shape without ever wrapping.
+    let read_cap = max_file_bytes.saturating_add(1);
     let mut buffer = Vec::new();
     file.by_ref()
-        .take(max_file_bytes + 1)
+        .take(read_cap)
         .read_to_end(&mut buffer)
         .map_err(|source| SvgError::Io {
             path: path_buf.clone(),
@@ -256,7 +265,19 @@ impl Source for SvgSource {
                 max_height: self.limits.max_height,
             });
         }
-        let alloc = (width as u64) * (height as u64) * 4;
+        // `width` and `height` are read from the document's own declared
+        // canvas, which is untrusted input: a caller who sets `max_width`
+        // or `max_height` near `u32::MAX` (a plausible way to say
+        // "effectively unbounded") can drive this multiplication past a
+        // `u64`, which would panic in a debug build and silently wrap in
+        // a release build rather than refuse. Saturating arithmetic keeps
+        // the refusal below exact: a saturated product is always larger
+        // than any real `max_alloc`, so the existing `AllocTooLarge`
+        // refusal still fires instead of the multiplication wrapping to a
+        // small number.
+        let alloc = (width as u64)
+            .saturating_mul(height as u64)
+            .saturating_mul(4);
         if alloc > self.limits.max_alloc {
             return Err(SvgError::AllocTooLarge {
                 path: path_buf,
@@ -313,5 +334,26 @@ mod tests {
     #[test]
     fn default_max_file_bytes_is_eight_mebibytes() {
         assert_eq!(SvgLimits::default().max_file_bytes, 8 * 1024 * 1024);
+    }
+
+    /// WR-02: `bounded_read` is public API, and a caller may plausibly
+    /// pass `u64::MAX` as `max_file_bytes` to mean "no limit". Before the
+    /// fix, `max_file_bytes + 1` overflowed a `u64` there: a panic in a
+    /// debug build, and in a release build a silent wrap to a cap of `0`,
+    /// which read a real, non-empty file as empty. This proves a
+    /// near-boundary cap neither panics nor silently truncates.
+    #[test]
+    fn bounded_read_does_not_overflow_when_the_cap_is_u64_max() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("tests/golden/formats/svg/base.svg");
+        let expected = std::fs::read(&path).expect("read base.svg directly");
+        let buffer = bounded_read(&path, u64::MAX)
+            .expect("a u64::MAX cap must not overflow or refuse a small file");
+        assert_eq!(
+            buffer, expected,
+            "a u64::MAX cap must return the file's whole content, not an empty read from a \
+             wrapped cap of zero"
+        );
     }
 }

@@ -354,6 +354,38 @@ fn an_oversized_declared_canvas_is_refused() {
     }
 }
 
+/// WR-02: `SvgLimits` is public API, so a caller may plausibly set
+/// `max_width`/`max_height` near `u32::MAX` to mean "effectively
+/// unbounded". Before the fix, `(width as u64) * (height as u64) * 4`
+/// overflowed a `u64` for a declared canvas this large: a panic in a
+/// debug build, and in a release build a silent wraparound that was only
+/// accidentally still caught by `max_alloc`. This proves the refusal
+/// fires through checked arithmetic rather than through an overflow that
+/// happens to land on the refusing side.
+#[test]
+fn a_near_u32_max_declared_canvas_is_refused_without_overflow() {
+    let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="4000000000" height="4000000000">
+  <rect x="0" y="0" width="10" height="10" fill="#ff0000"/>
+</svg>
+"##;
+    let dir = std::env::temp_dir();
+    let path = dir.join("chrys-source-svg-near-u32-max-canvas-test.svg");
+    std::fs::write(&path, svg).expect("write the temporary SVG");
+
+    let source = SvgSource::with_limits(SvgLimits {
+        max_width: u32::MAX,
+        max_height: u32::MAX,
+        ..SvgLimits::default()
+    });
+    let result = source.load(&path);
+    std::fs::remove_file(&path).ok();
+
+    match result {
+        Err(SvgError::AllocTooLarge { .. }) => {}
+        other => panic!("expected SvgError::AllocTooLarge, got {other:?}"),
+    }
+}
+
 /// The boundary case that cannot depend on how `usvg` handles a very
 /// large declared number at all: `SvgSource::with_limits` carrying a
 /// `max_width` of 1 refuses the committed 256 by 256 fixture with the
