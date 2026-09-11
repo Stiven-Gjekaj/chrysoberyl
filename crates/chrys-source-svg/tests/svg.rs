@@ -411,3 +411,29 @@ fn a_max_width_of_one_refuses_the_committed_fixture() {
         other => panic!("expected SvgError::CanvasTooLarge, got {other:?}"),
     }
 }
+
+/// WR-03: `Io` is enforced (`SvgSource::load`'s metadata read propagates
+/// any I/O error) but was never exercised by a test. A path that does
+/// not exist is the simplest way to reach it, before any other refusal
+/// in `load` has a chance to run.
+#[test]
+fn a_missing_path_reports_the_io_variant() {
+    let dir = std::env::temp_dir();
+    let path = dir.join("chrys-source-svg-a-path-that-does-not-exist.svg");
+    std::fs::remove_file(&path).ok();
+    assert!(
+        !path.exists(),
+        "the test path must not exist for this test to prove anything"
+    );
+
+    let source = SvgSource::new();
+    match source.load(&path) {
+        Err(SvgError::Io { path: err_path, .. }) => {
+            assert_eq!(
+                err_path, path,
+                "the refusal must name the path that could not be read"
+            );
+        }
+        other => panic!("expected SvgError::Io, got {other:?}"),
+    }
+}
