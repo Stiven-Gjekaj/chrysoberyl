@@ -169,10 +169,14 @@ pub fn load_mask(
 /// Neither check falls back to reading the file, silently drops the rule,
 /// or canonicalizes first and asks afterwards (T-03-08).
 pub(crate) fn resolve_mask_path(rule_dir: &Path, mask_path: &Path) -> Result<PathBuf, RuleError> {
-    if mask_path.is_absolute()
-        || mask_path
-            .components()
-            .any(|component| component == Component::ParentDir)
+    // Each component must be a plain name or `.`. `is_absolute` is not
+    // enough: on Windows, `/etc/passwd` has a root and no drive, so it is
+    // not absolute, and `C:mask.png` has a drive and no root. `join` with
+    // either one leaves `rule_dir`. A root, a drive prefix and `..` are
+    // each refused here.
+    if mask_path
+        .components()
+        .any(|component| !matches!(component, Component::Normal(_) | Component::CurDir))
     {
         return Err(RuleError::MaskPathEscapesDirectory {
             rule_dir: rule_dir.to_path_buf(),

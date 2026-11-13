@@ -200,3 +200,18 @@ fn a_mask_above_the_decode_limits_is_refused() {
         other => panic!("expected RuleError::MaskDecode, got {other:?}"),
     }
 }
+
+/// On Windows, a path with a drive and no root is relative to the current
+/// directory of that drive, not to the rule file. It is refused.
+#[cfg(windows)]
+#[test]
+fn a_drive_relative_mask_path_is_refused() {
+    let dir = temp_dir("drive-relative");
+    let rule_path = write_rule_file(&dir, "C:mask.png");
+
+    let error = chrys_rule::load_rules(&rule_path).expect_err("a drive path is refused");
+    match error {
+        RuleError::MaskPathEscapesDirectory { .. } => {}
+        other => panic!("expected RuleError::MaskPathEscapesDirectory, got {other:?}"),
+    }
+}
