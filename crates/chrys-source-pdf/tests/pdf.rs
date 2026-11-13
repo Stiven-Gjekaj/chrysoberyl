@@ -11,13 +11,39 @@ fn fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
+/// A scratch file in a directory that this test owns. The directory is
+/// removed when the value is dropped, so a test run leaves nothing behind.
+struct Scratch {
+    dir: PathBuf,
+    path: PathBuf,
+}
+
+impl std::ops::Deref for Scratch {
+    type Target = Path;
+    fn deref(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl AsRef<Path> for Scratch {
+    fn as_ref(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for Scratch {
+    fn drop(&mut self) {
+        std::fs::remove_dir_all(&self.dir).ok();
+    }
+}
+
 /// Write `bytes` to a new file in a directory that this test owns.
-fn scratch_file(test: &str, bytes: &[u8]) -> PathBuf {
+fn scratch_file(test: &str, bytes: &[u8]) -> Scratch {
     let dir = std::env::temp_dir().join(format!("chrys-pdf-{test}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("make the scratch directory");
     let path = dir.join("input");
     std::fs::write(&path, bytes).expect("write the scratch file");
-    path
+    Scratch { dir, path }
 }
 
 /// A minimal PDF with `pages` empty pages of 100 by 50 points.

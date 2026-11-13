@@ -42,9 +42,35 @@ impl Drop for TempStore {
     }
 }
 
+/// A scratch file or directory that this test owns. Its directory is
+/// removed when the value is dropped, so a test run leaves nothing behind.
+struct Scratch {
+    dir: PathBuf,
+    path: PathBuf,
+}
+
+impl std::ops::Deref for Scratch {
+    type Target = Path;
+    fn deref(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl AsRef<Path> for Scratch {
+    fn as_ref(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for Scratch {
+    fn drop(&mut self) {
+        std::fs::remove_dir_all(&self.dir).ok();
+    }
+}
+
 /// Write `contents` to a fresh file named `name` under a fresh temporary
 /// directory, and return its path.
-fn write_candidate_file(label: &str, name: &str, contents: &[u8]) -> PathBuf {
+fn write_candidate_file(label: &str, name: &str, contents: &[u8]) -> Scratch {
     let dir = std::env::temp_dir().join(format!(
         "chrys-baseline-candidate-{label}-{}",
         std::process::id()
@@ -52,12 +78,12 @@ fn write_candidate_file(label: &str, name: &str, contents: &[u8]) -> PathBuf {
     std::fs::create_dir_all(&dir).expect("create candidate directory");
     let path = dir.join(name);
     std::fs::write(&path, contents).expect("write candidate file");
-    path
+    Scratch { dir, path }
 }
 
 /// Write every `(name, contents)` pair in `files` under a fresh temporary
 /// directory, and return the directory's own path.
-fn write_candidate_dir(label: &str, files: &[(&str, &[u8])]) -> PathBuf {
+fn write_candidate_dir(label: &str, files: &[(&str, &[u8])]) -> Scratch {
     let dir = std::env::temp_dir().join(format!(
         "chrys-baseline-candidate-dir-{label}-{}",
         std::process::id()
@@ -66,7 +92,10 @@ fn write_candidate_dir(label: &str, files: &[(&str, &[u8])]) -> PathBuf {
     for (name, contents) in files {
         std::fs::write(dir.join(name), contents).expect("write candidate file");
     }
-    dir
+    Scratch {
+        path: dir.clone(),
+        dir,
+    }
 }
 
 #[test]

@@ -11,12 +11,36 @@ use std::path::{Path, PathBuf};
 
 use chrys_rule::RuleError;
 
+/// A temporary directory that one test owns. It is removed when the value
+/// is dropped, so a test run leaves nothing behind.
+struct TempDir(PathBuf);
+
+impl std::ops::Deref for TempDir {
+    type Target = Path;
+    fn deref(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl AsRef<Path> for TempDir {
+    fn as_ref(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        std::fs::remove_dir_all(&self.0).ok();
+    }
+}
+
 /// Build a fresh, empty temporary directory for one test. `label` names
 /// the test, so no two tests in this file can collide over the same path.
-fn temp_dir(label: &str) -> PathBuf {
+fn temp_dir(label: &str) -> TempDir {
     let dir = std::env::temp_dir().join(format!("chrys-rule-mask-path-test-{label}"));
+    std::fs::remove_dir_all(&dir).ok();
     std::fs::create_dir_all(&dir).expect("create temp test directory");
-    dir
+    TempDir(dir)
 }
 
 /// Write a one-rule rule file into `dir`, naming `mask_value` as its
@@ -54,7 +78,7 @@ fn a_mask_path_that_leaves_the_rule_file_directory_is_refused() {
             rule_dir,
             mask_path,
         } => {
-            assert_eq!(rule_dir, dir);
+            assert_eq!(rule_dir, dir.0);
             assert_eq!(mask_path, PathBuf::from("../../etc/passwd"));
             assert!(
                 message.contains(dir.to_str().expect("temp dir is UTF-8")),

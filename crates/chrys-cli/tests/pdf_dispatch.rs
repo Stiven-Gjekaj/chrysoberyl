@@ -46,6 +46,7 @@ fn the_dispatch_reads_the_content_not_the_extension() {
     std::fs::copy(fixture("candidate.pdf"), &candidate).expect("copy candidate");
 
     let output = compare(&base, &candidate);
+    std::fs::remove_dir_all(&dir).ok();
     let stdout = String::from_utf8(output.stdout).expect("stdout is UTF-8");
     assert!(
         stdout.contains("1 of 2 frames changed"),
