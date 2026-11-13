@@ -61,7 +61,7 @@ jobs:
 
       - name: Run the workspace tests with every feature
         shell: bash
-        run: cargo test --workspace --features chrys-cli/pdf,chrys-cli/view
+        run: cargo test --workspace --features chrys-cli/pdf,chrys-cli/view,chrys-cli/video
 
   digest:
     name: digest (${{ matrix.label }})
@@ -153,6 +153,17 @@ jobs:
           # weaken what is compared.
           echo "== tests/golden/formats/pdf ==" >> digest.txt
           cargo run -q --release -p chrys-cli --features pdf -- compare tests/golden/formats/pdf/base.pdf tests/golden/formats/pdf/candidate.pdf --hash-only >> digest.txt
+
+          # Phase 7 gate: AV1 video. The decoder runs without assembly on
+          # one thread, and the colour conversion is integer only. The
+          # conformance test in chrys-source-video compares the decoded
+          # planes with libdav1d. This line proves the same frames, and the
+          # same verdicts, on each runner. The second pair proves that a
+          # frame rate change alone gives no change on each runner.
+          echo "== tests/golden/formats/av1 ==" >> digest.txt
+          cargo run -q --release -p chrys-cli --features video -- compare tests/golden/formats/av1/base.ivf tests/golden/formats/av1/candidate.ivf --hash-only >> digest.txt
+          echo "== tests/golden/formats/av1 (frame rate) ==" >> digest.txt
+          cargo run -q --release -p chrys-cli --features video -- compare tests/golden/formats/av1/base.ivf tests/golden/formats/av1/double.ivf --hash-only >> digest.txt
 
       - name: Upload the digest report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
