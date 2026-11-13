@@ -61,7 +61,7 @@ jobs:
 
       - name: Run the workspace tests with every feature
         shell: bash
-        run: cargo test --workspace --features chrys-cli/pdf,chrys-cli/view,chrys-cli/video
+        run: cargo test --workspace --features chrys-cli/pdf,chrys-cli/view,chrys-cli/video,chrys-cli/mesh
 
   digest:
     name: digest (${{ matrix.label }})
@@ -164,6 +164,14 @@ jobs:
           cargo run -q --release -p chrys-cli --features video -- compare tests/golden/formats/av1/base.ivf tests/golden/formats/av1/candidate.ivf --hash-only >> digest.txt
           echo "== tests/golden/formats/av1 (frame rate) ==" >> digest.txt
           cargo run -q --release -p chrys-cli --features video -- compare tests/golden/formats/av1/base.ivf tests/golden/formats/av1/double.ivf --hash-only >> digest.txt
+
+          # Phase 8 gate: the mesh rig. The rasterizer is written in this
+          # repository. Its float stage uses only operations that IEEE 754
+          # makes exact, and its coverage, depth and pattern stages use
+          # integers. This line proves the eight views, and the verdicts,
+          # on each operating system and on x86-64 and aarch64.
+          echo "== tests/golden/formats/mesh ==" >> digest.txt
+          cargo run -q --release -p chrys-cli --features mesh -- compare tests/golden/formats/mesh/base.obj tests/golden/formats/mesh/candidate.obj --hash-only >> digest.txt
 
       - name: Upload the digest report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
