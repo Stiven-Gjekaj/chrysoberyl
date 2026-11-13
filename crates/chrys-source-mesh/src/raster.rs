@@ -12,6 +12,21 @@
 //! - A pixel is covered or not covered. There is no anti-aliasing, so no
 //!   blend can round differently.
 //! - Equal depth keeps the triangle that came first in the file.
+//! - The shade of a pixel is the face shade times a depth factor, so a
+//!   nearer surface is brighter. Without the depth factor, a face that is
+//!   parallel to a face behind it has the same shade, and a view cannot
+//!   show a step between them. The factor uses integer arithmetic.
+//! - Each surface carries a fixed pattern in model space: cells of 1/8
+//!   of the radius, each with one of four tones from an integer hash of
+//!   the cell. A flat face of one shade gives the registration step of
+//!   the engine no detail, and the engine then refuses the pair or misses
+//!   a small step. A periodic pattern, such as a checker, is also wrong:
+//!   it gives the phase correlation many equal peaks. The hash gives no
+//!   period.
+//! - The background is a fixed backdrop of light cells in screen space,
+//!   with the same hash. It is the same in each render, so it gives the
+//!   registration step a strong peak at zero offset. A plain white
+//!   background gave a peak too weak for the engine to accept.
 
 use crate::parse::Triangle;
 use crate::rig::View;
@@ -30,8 +45,8 @@ const FILL: f32 = 0.9;
 /// The light direction, (1, 2, 3) / sqrt(14), written as constants.
 const LIGHT: [f32; 3] = [0.267_261_24, 0.534_522_5, 0.801_783_7];
 
-/// The colour of the background: opaque white.
-const BACKGROUND: [u8; 4] = [255, 255, 255, 255];
+/// The side of one backdrop cell, in pixels.
+const BACKDROP_CELL: usize = 1;
 
 /// One rendered view.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -89,8 +104,13 @@ struct Setup {
     x: [i64; 3],
     y: [i64; 3],
     z: [i64; 3],
+    /// The model position of each corner, in fixed point.
+    model: [[i64; 3]; 3],
     shade: u8,
 }
+
+/// The size of one checker cell, in the fixed point of `DEPTH_SCALE`.
+const CELL: i64 = DEPTH_SCALE as i64 / 8;
 
 fn setup(triangle: &Triangle, view: &View) -> Setup {
     let rotate = |point: [f32; 3]| -> [f32; 3] {
@@ -103,6 +123,7 @@ fn setup(triangle: &Triangle, view: &View) -> Setup {
     let x = points.map(|p| to_fixed((p[0] * FILL + 1.0) * half));
     let y = points.map(|p| to_fixed((1.0 - p[1] * FILL) * half));
     let z = points.map(|p| (p[2] * DEPTH_SCALE).round() as i64);
+    let model = triangle.map(|p| p.map(|value| (value * DEPTH_SCALE).round() as i64));
 
     // Flat shade from the angle between the face and a fixed light. The
     // light is in view space, so each view has the same lighting.
@@ -128,7 +149,49 @@ fn setup(triangle: &Triangle, view: &View) -> Setup {
         0.0
     };
     let shade = ((0.15 + 0.7 * facing) * 255.0).round().clamp(0.0, 255.0) as u8;
-    Setup { x, y, z, shade }
+    Setup {
+        x,
+        y,
+        z,
+        model,
+        shade,
+    }
+}
+
+/// Scale a face shade by the depth: from one half at the back of the unit
+/// sphere to one at the front.
+fn depth_shade(shade: u8, z: i64) -> u8 {
+    let unit = DEPTH_SCALE as i64;
+    let z = z.clamp(-unit, unit);
+    // The factor, in parts of 4 * unit: 3 * unit + z, from 2 to 4.
+    let factor = 3 * unit + z;
+    (i64::from(shade) * factor / (4 * unit)) as u8
+}
+
+/// Return the tone, 0 to 3, of the pattern cell at the edge weights `w`.
+///
+/// The three weights add up to `area`, so a face at a constant model
+/// coordinate gives that exact coordinate, with no rounding.
+fn cell_tone(model: &[[i64; 3]; 3], w: [i64; 3], area: i64) -> u8 {
+    let cells = [0, 1, 2].map(|axis| {
+        let position = (i128::from(w[0]) * i128::from(model[0][axis])
+            + i128::from(w[1]) * i128::from(model[1][axis])
+            + i128::from(w[2]) * i128::from(model[2][axis]))
+        .div_euclid(i128::from(area)) as i64;
+        position.div_euclid(CELL) as u64
+    });
+    hash_tone(&cells)
+}
+
+/// Mix the cell coordinates into a tone from 0 to 3. A multiply and
+/// xor-shift mix, integer only, so each machine gives the same tone.
+fn hash_tone(cells: &[u64]) -> u8 {
+    let mut hash: u64 = 0x9e37_79b9_7f4a_7c15;
+    for &cell in cells {
+        hash = (hash ^ cell).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        hash ^= hash >> 31;
+    }
+    (hash >> 62) as u8
 }
 
 /// The edge function: twice the signed area of (a, b, p).
@@ -148,6 +211,7 @@ pub fn render(triangles: &[Triangle], view: &View) -> Rendered {
     let size = SIZE as usize;
     let mut depth = vec![i64::MIN; size * size];
     let mut owner = vec![usize::MAX; size * size];
+    let mut tone = vec![0u8; size * size];
     let mut shades = Vec::with_capacity(triangles.len());
 
     for (index, triangle) in triangles.iter().enumerate() {
@@ -162,6 +226,7 @@ pub fn render(triangles: &[Triangle], view: &View) -> Rendered {
             s.x.swap(1, 2);
             s.y.swap(1, 2);
             s.z.swap(1, 2);
+            s.model.swap(1, 2);
             area = -area;
         }
 
@@ -198,6 +263,7 @@ pub fn render(triangles: &[Triangle], view: &View) -> Rendered {
                 if z > depth[at] {
                     depth[at] = z;
                     owner[at] = index;
+                    tone[at] = cell_tone(&s.model, w, area);
                 }
             }
         }
@@ -205,13 +271,22 @@ pub fn render(triangles: &[Triangle], view: &View) -> Rendered {
 
     let mut visible = vec![false; triangles.len()];
     let mut pixels = Vec::with_capacity(size * size * 4);
-    for &triangle in &owner {
+    for (at, ((&triangle, &z), &tone)) in owner.iter().zip(&depth).zip(&tone).enumerate() {
         if triangle == usize::MAX {
-            pixels.extend_from_slice(&BACKGROUND);
+            let (x, y) = (at % size / BACKDROP_CELL, at / size / BACKDROP_CELL);
+            let value = 255 - 12 * hash_tone(&[x as u64, y as u64]);
+            pixels.extend_from_slice(&[value, value, value, 255]);
         } else {
             visible[triangle] = true;
-            let shade = shades[triangle];
-            pixels.extend_from_slice(&[shade, shade, shade, 255]);
+            let mut value = depth_shade(shades[triangle], z);
+            // Four tones: 100, 92, 84 and 76 percent of the shade.
+            value = (u16::from(value) * (25 - 2 * u16::from(tone)) / 25) as u8;
+            // A fine grain in screen space, the same at a pixel in each
+            // render. It gives the registration step detail at each
+            // frequency.
+            let (x, y) = (at % size, at / size);
+            value = value.saturating_sub(4 * hash_tone(&[x as u64, y as u64, 7]));
+            pixels.extend_from_slice(&[value, value, value, 255]);
         }
     }
     Rendered { pixels, visible }
@@ -235,10 +310,12 @@ mod tests {
         // The front view of a square fills a block with no gap and no
         // double cover on the diagonal.
         let rendered = render(&square(0.0), &VIEWS[0]);
+        let empty = render(&[], &VIEWS[0]);
         let covered = rendered
             .pixels
             .chunks_exact(4)
-            .filter(|p| p[0] != 255)
+            .zip(empty.pixels.chunks_exact(4))
+            .filter(|(a, b)| a != b)
             .count();
         // The square spans FILL of the image on each side.
         let side = (SIZE as f32 * FILL) as usize;
@@ -254,6 +331,14 @@ mod tests {
         assert_eq!(rendered.visible, vec![false, false, true, true]);
         let back = render(&triangles, &VIEWS[1]);
         assert_eq!(back.visible, vec![true, true, false, false]);
+    }
+
+    #[test]
+    fn a_nearer_surface_is_brighter() {
+        let unit = DEPTH_SCALE as i64;
+        assert_eq!(depth_shade(200, unit), 200);
+        assert_eq!(depth_shade(200, -unit), 100);
+        assert!(depth_shade(200, 0) > depth_shade(200, -unit / 2));
     }
 
     #[test]

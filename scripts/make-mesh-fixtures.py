@@ -8,8 +8,10 @@ Each file is a Wavefront OBJ with three boxes:
 - a small cube inside the base block. No view sees it, so its 12
   triangles are the measured blind spot.
 
-The candidate moves the top block 0.2 to the right. The bounding box of
-the mesh does not change, so the scale of each view does not change.
+The candidate adds a small cube, 0.06 on each side, on the base block.
+The bounding box of the mesh does not change, so the scale of each view
+does not change. The engine compares near-identical pairs only, so the
+change is small.
 """
 
 import pathlib
@@ -29,12 +31,14 @@ def box(low, high):
     return corners, faces
 
 
-def write(path, shift):
+def write(path, bump):
     boxes = [
         box((0, 0, 0), (2, 1, 1)),
-        box((0 + shift, 1, 0), (1 + shift, 1.5, 1)),
+        box((0, 1, 0), (1, 1.5, 1)),
         box((0.8, 0.4, 0.4), (1.2, 0.6, 0.6)),
     ]
+    if bump:
+        boxes.append(box((1.5, 1, 0.45), (1.56, 1.06, 0.51)))
     lines = ["# Chrysoberyl mesh fixture"]
     offset = 0
     for corners, faces in boxes:
@@ -47,8 +51,8 @@ def write(path, shift):
 def main():
     root = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "tests/golden/formats/mesh")
     root.mkdir(parents=True, exist_ok=True)
-    write(root / "base.obj", 0.0)
-    write(root / "candidate.obj", 0.2)
+    write(root / "base.obj", False)
+    write(root / "candidate.obj", True)
 
 
 if __name__ == "__main__":

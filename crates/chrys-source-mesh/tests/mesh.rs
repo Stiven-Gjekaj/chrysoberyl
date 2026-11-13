@@ -26,7 +26,13 @@ fn a_mesh_becomes_eight_views() {
     for (index, frame) in frames.iter().enumerate() {
         assert_eq!(frame.index, index);
         assert_eq!((frame.width, frame.height), (raster::SIZE, raster::SIZE));
-        let drawn = frame.pixels.chunks_exact(4).filter(|p| p[0] != 255).count();
+        let empty = raster::render(&[], &rig::VIEWS[index]);
+        let drawn = frame
+            .pixels
+            .chunks_exact(4)
+            .zip(empty.pixels.chunks_exact(4))
+            .filter(|(a, b)| a != b)
+            .count();
         assert!(drawn > 1000, "view {index} draws {drawn} pixels");
     }
 }
@@ -62,7 +68,7 @@ fn the_blind_spot_counts_the_hidden_triangles() {
 }
 
 #[test]
-fn the_candidate_changes_the_views_that_show_the_step() {
+fn the_candidate_changes_the_views_that_see_the_new_cube() {
     let source = MeshSource::new();
     let base = source.load(&fixture("base.obj")).expect("base");
     let candidate = source.load(&fixture("candidate.obj")).expect("candidate");
@@ -73,12 +79,12 @@ fn the_candidate_changes_the_views_that_show_the_step() {
         .filter(|((b, c), _)| b.pixels != c.pixels)
         .map(|(_, view)| view.name)
         .collect();
-    // The top view shows two flat faces with the same normal, so the same
-    // shade, and an orthographic view shows no depth. The side views show
-    // the same outline. Only the four views that show the step change.
+    // The new cube sits on the top of the base block. The left view does
+    // not see it, because the top block is in front of it. The bottom and
+    // the lower corner views look from below.
     assert_eq!(
         changed,
-        vec!["front", "back", "upper corner", "lower corner"]
+        vec!["front", "back", "right", "top", "upper corner"]
     );
 }
 
