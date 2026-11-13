@@ -2,12 +2,28 @@
 
 This file records each notable change to Chrysoberyl. The format follows
 Keep a Changelog (https://keepachangelog.com). The project aims to follow
-semantic versioning. No version is released yet.
+semantic versioning.
 
 ## Unreleased
 
+## 1.0.0 (2026-11-13)
+
+The first release. Each input below gives the same verdict on Linux, macOS
+and Windows, on x86-64 and aarch64. Six CI runners prove it on each push.
+
 ### Added
 
+- **The comparison engine.** It names each change: moved, added, removed,
+  recoloured or resized, with a bounding box, an offset and a colour
+  difference. It does not report antialiasing. It refuses a pair that is
+  not near-identical, and says why.
+- **Raster images, frame sequences and animation.** PNG, JPEG, WebP, TIFF,
+  a directory of numbered frames, GIF, APNG and animated WebP.
+- **SVG** through `resvg`, with one font pinned in the repository.
+- **Baselines, rules and a CI gate.** `chrys accept` writes a baseline and a
+  manifest of digests. A TOML rule file tolerates a kind of change inside a
+  named region or a mask. The exit code gates CI, and `--report` writes a
+  TOML report.
 - **PDF pages** (feature `pdf`). `hayro` rasterizes each page on the CPU at
   144 pixels per inch, at the scalar SIMD level, on one thread. Six CI
   runners agree on the digests.
@@ -31,6 +47,8 @@ semantic versioning. No version is released yet.
   Windows.
 - `docs/DESIGN.md`, `docs/DECISIONS.md`, the README and the standard
   repository files.
+- Release archives for five platforms, and the API documentation on GitHub
+  Pages.
 
 ### Fixed
 
@@ -43,14 +61,3 @@ semantic versioning. No version is released yet.
 ### Removed
 
 - The GSD planning files. `docs/DESIGN.md` keeps their content.
-
-## Phases 1 to 4 (2026-09-06 to 2026-09-09)
-
-- The comparison engine: registration, residual, labelled regions, the kind
-  of each change, the antialiasing filter and the refusal.
-- The determinism proof on six runners, three operating systems and two
-  architectures.
-- Raster images, numbered frame sequences, GIF, APNG and animated WebP.
-- The baseline store and its manifest, the TOML rule engine, the report and
-  the CI gate.
-- SVG through `resvg`, with one font pinned in the repository.
