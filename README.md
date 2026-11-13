@@ -1,5 +1,7 @@
 <div align="center">
 
+![Chrysoberyl](assets/brand/wordmark.svg)
+
 ### A structural diff for everything that is not text
 
 _It reports what changed, not which pixels differ, and it gives the same verdict on every machine_
