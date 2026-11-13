@@ -499,6 +499,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "chrys-source-mesh"
+version = "0.1.0"
+dependencies = [
+ "chrys-source",
+ "png",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "chrys-source-pdf"
 version = "0.1.0"
 dependencies = [
