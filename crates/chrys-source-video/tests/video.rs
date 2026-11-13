@@ -118,3 +118,18 @@ fn a_file_that_is_not_ivf_is_refused() {
     let error = VideoSource::new().load(&path).expect_err("refused");
     assert!(matches!(error, VideoError::Container { .. }), "{error}");
 }
+
+#[test]
+fn a_caller_with_a_small_stack_can_decode() {
+    // The Windows main thread has 1 MiB of stack. This caller has less, so
+    // the decode must not use the stack of its caller.
+    let path = fixture("base.ivf");
+    let frames = std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(move || VideoSource::new().load(&path).map(|frames| frames.len()))
+        .expect("spawn")
+        .join()
+        .expect("no panic")
+        .expect("decode");
+    assert_eq!(frames, 8);
+}

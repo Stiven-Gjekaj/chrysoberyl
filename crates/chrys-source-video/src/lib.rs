@@ -150,6 +150,9 @@ pub fn looks_like_video(path: &Path) -> std::io::Result<bool> {
     Ok(ivf::is_ivf(&head[..read]))
 }
 
+/// The stack size of the decoder thread: 64 MiB.
+const DECODER_STACK_BYTES: usize = 64 * 1024 * 1024;
+
 /// The time base and the decoded pictures, each with its timestamp.
 type Decoded = ((u32, u32), Vec<(Picture, i64)>);
 
@@ -210,7 +213,32 @@ impl VideoSource {
         Ok(self.decode_with_time_base(path)?.1)
     }
 
+    /// Decode on a thread with a stack of `DECODER_STACK_BYTES`.
+    ///
+    /// The decoder uses large stack frames. A debug build on Windows,
+    /// where the main thread has 1 MiB, overflows the stack. A fixed stack
+    /// makes the limit the same on each platform and in each build.
     fn decode_with_time_base(&self, path: &Path) -> Result<Decoded, VideoError> {
+        std::thread::scope(|scope| {
+            std::thread::Builder::new()
+                .name("av1-decode".to_string())
+                .stack_size(DECODER_STACK_BYTES)
+                .spawn_scoped(scope, || self.decode_on_this_thread(path))
+                .map_err(|source| VideoError::Io {
+                    path: path.to_path_buf(),
+                    source,
+                })?
+                .join()
+                .unwrap_or_else(|_| {
+                    Err(VideoError::Decode {
+                        path: path.to_path_buf(),
+                        message: "the decoder thread stopped with a panic".to_string(),
+                    })
+                })
+        })
+    }
+
+    fn decode_on_this_thread(&self, path: &Path) -> Result<Decoded, VideoError> {
         let bytes = read_bounded(path, self.limits.max_file_bytes)?;
         let (header, packets) = ivf::parse(&bytes).map_err(|reason| VideoError::Container {
             path: path.to_path_buf(),
