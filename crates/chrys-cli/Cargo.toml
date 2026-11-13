@@ -17,6 +17,8 @@ pdf = ["dep:chrys-source-pdf"]
 view = ["dep:chrys-view", "dep:chrys-gpu"]
 # AV1 video in IVF, decoded in software. Off by default.
 video = ["dep:chrys-source-video"]
+# OBJ and STL meshes, through the fixed eight-view rig. Off by default.
+mesh = ["dep:chrys-source-mesh"]
 
 [[bin]]
 name = "chrys"
@@ -31,6 +33,7 @@ chrys-source-svg = { path = "../chrys-source-svg" }
 chrys-source-pdf = { path = "../chrys-source-pdf", optional = true }
 chrys-view = { path = "../chrys-view", optional = true }
 chrys-source-video = { path = "../chrys-source-video", optional = true }
+chrys-source-mesh = { path = "../chrys-source-mesh", optional = true }
 chrys-gpu = { path = "../chrys-gpu", optional = true }
 chrys-core = { path = "../chrys-core" }
 chrys-rule = { path = "../chrys-rule" }

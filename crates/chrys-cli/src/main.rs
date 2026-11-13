@@ -556,6 +556,11 @@ fn run_compare(
         println!("{changed} of {} frames changed", verdicts.len());
     }
 
+    // A mesh pair names the surface that the rig did not compare.
+    if let Some(line) = mesh_blind_spot(base_path)? {
+        println!("{line}");
+    }
+
     // `outcomes` was computed above, before the output branches, so the
     // report could carry it whichever branch returned; the exit code
     // below reads it the same way it did before this flag existed
@@ -807,6 +812,68 @@ fn starts_like_video(path: &Path) -> anyhow::Result<bool> {
     Ok(head == b"DKIF")
 }
 
+/// Return true when the content of `path` is an OBJ or an STL mesh.
+#[cfg(feature = "mesh")]
+fn starts_like_mesh(path: &Path) -> anyhow::Result<bool> {
+    Ok(chrys_source_mesh::looks_like_mesh(path)?)
+}
+
+/// Return true when `path` holds a text mesh: an ASCII STL, or an OBJ.
+///
+/// A binary without the `mesh` feature uses this test only to refuse a
+/// mesh with a clear message. It does not find a binary STL, which has no
+/// signature. Such a file goes to the raster adapter, which refuses it.
+#[cfg(not(feature = "mesh"))]
+fn starts_like_mesh(path: &Path) -> anyhow::Result<bool> {
+    use std::io::Read;
+    let mut head = Vec::new();
+    std::fs::File::open(path)
+        .map_err(|error| anyhow::anyhow!("cannot read {}: {error}", path.display()))?
+        .take(4096)
+        .read_to_end(&mut head)?;
+    let Ok(text) = std::str::from_utf8(&head) else {
+        return Ok(false);
+    };
+    let stl = text.trim_start().starts_with("solid") && text.contains("facet");
+    let obj = text.lines().any(|line| line.starts_with("v ")) && text.contains("\nf ");
+    Ok(stl || obj)
+}
+
+/// Render the eight views of the mesh at `path`.
+#[cfg(feature = "mesh")]
+fn load_mesh(path: &Path) -> anyhow::Result<Vec<(String, Frame)>> {
+    Ok(chrys_source_mesh::MeshSource::new().load_named(path)?)
+}
+
+/// Refuse a mesh, because this binary has no mesh support.
+#[cfg(not(feature = "mesh"))]
+fn load_mesh(path: &Path) -> anyhow::Result<Vec<(String, Frame)>> {
+    anyhow::bail!(
+        "{} is a mesh file, and this binary was built without the `mesh` feature",
+        path.display()
+    )
+}
+
+/// The blind spot line for a mesh, or `None` for each other input.
+#[cfg(feature = "mesh")]
+fn mesh_blind_spot(path: &Path) -> anyhow::Result<Option<String>> {
+    if path.is_dir() || !chrys_source_mesh::looks_like_mesh(path)? {
+        return Ok(None);
+    }
+    let blind = chrys_source_mesh::MeshSource::new().blind_spot(path)?;
+    let name = path
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.display().to_string());
+    Ok(Some(format!("{name} {blind}")))
+}
+
+/// No input is a mesh in a binary without the `mesh` feature.
+#[cfg(not(feature = "mesh"))]
+fn mesh_blind_spot(_path: &Path) -> anyhow::Result<Option<String>> {
+    Ok(None)
+}
+
 /// Decode each frame of the video at `path`, in presentation order.
 #[cfg(feature = "video")]
 fn load_video(path: &Path) -> anyhow::Result<Vec<(String, Frame)>> {
@@ -899,6 +966,8 @@ fn named_frames_for(path: &Path) -> anyhow::Result<(Vec<String>, Vec<Frame>)> {
         load_pdf(path)?
     } else if chrys_source_svg::looks_like_svg(path)? {
         SvgSource::new().load_named(path)?
+    } else if starts_like_mesh(path)? {
+        load_mesh(path)?
     } else if chrys_source_animation::sniff::is_animation(path)? {
         AnimationSource::new().load_named(path)?
     } else {
