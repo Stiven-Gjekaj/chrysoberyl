@@ -61,7 +61,7 @@ jobs:
 
       - name: Run the workspace tests with every feature
         shell: bash
-        run: cargo test --workspace --features chrys-cli/pdf,chrys-cli/view,chrys-cli/video,chrys-cli/mesh
+        run: cargo test --workspace --no-fail-fast --features chrys-cli/pdf,chrys-cli/view,chrys-cli/video,chrys-cli/mesh
 
   digest:
     name: digest (${{ matrix.label }})
