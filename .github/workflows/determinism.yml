@@ -123,6 +123,16 @@ jobs:
           echo "== tests/golden/formats/svg ==" >> digest.txt
           cargo run -q --release -p chrys-cli -- compare tests/golden/formats/svg/base.svg tests/golden/formats/svg/candidate.svg --hash-only >> digest.txt
 
+          # Phase 5 gate: the PDF pages. The `pdf` feature is off by
+          # default, so this line builds it on. The adapter sets the
+          # scalar SIMD level, one thread, and the integer pipeline. The
+          # fixture holds no image, because hayro scales an image at a
+          # SIMD level that the adapter cannot set. If this line
+          # disagrees, the PDF claim is withdrawn in writing. Do not
+          # weaken what is compared.
+          echo "== tests/golden/formats/pdf ==" >> digest.txt
+          cargo run -q --release -p chrys-cli --features pdf -- compare tests/golden/formats/pdf/base.pdf tests/golden/formats/pdf/candidate.pdf --hash-only >> digest.txt
+
       - name: Upload the digest report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
