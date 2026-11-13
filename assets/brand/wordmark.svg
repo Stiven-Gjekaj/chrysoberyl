@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 756 180" width="756" height="180" role="img" aria-label="Chrysoberyl">
+  <title>Chrysoberyl</title>
+
+  <!-- Made by scripts/make-wordmark.py. Edit the script, not this file. -->
+
+  <defs>
+    <!-- Chrysoberyl yellow green, then the colour change of alexandrite:
+         teal, purple and red. The shift runs along the word. -->
+    <linearGradient id="ink" x1="0" y1="0" x2="1" y2="0.35">
+      <stop offset="0" stop-color="#d4e157"/>
+      <stop offset="0.35" stop-color="#8bc34a"/>
+      <stop offset="0.6" stop-color="#26a69a"/>
+      <stop offset="0.82" stop-color="#ab47bc"/>
+      <stop offset="1" stop-color="#ec407a"/>
+    </linearGradient>
+
+    <filter id="glow" x="-20%" y="-40%" width="140%" height="180%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- The outline of the gem. The cat's-eye line stays inside it. -->
+    <clipPath id="stone">
+      <path d="M87 44h28v7h-28zM80 51h42v7h-42zM66 58h63v7h-63zM59 65h77v7h-77zM52 72h84v7h-84zM52 79h84v7h-84zM45 86h91v7h-91zM45 93h84v7h-84zM45 100h84v7h-84zM45 107h77v7h-77zM52 114h63v7h-63zM59 121h49v7h-49zM66 128h35v7h-35zM66 44h21v7h-21zM59 51h21v7h-21zM52 58h14v7h-14zM45 65h14v7h-14zM45 72h7v7h-7zM45 79h7v7h-7zM129 93h7v7h-7zM129 100h7v7h-7zM122 107h14v7h-14zM115 114h14v7h-14zM108 121h14v7h-14zM101 128h14v7h-14z"/>
+    </clipPath>
+  </defs>
+
+  <!-- The panel is near black, so it reads on the light and on the dark
+       GitHub theme. The border is yellow green at a low opacity. -->
+  <rect width="756" height="180" rx="16" fill="#111111"/>
+  <rect x="6" y="6" width="744" height="168" rx="11"
+        fill="none" stroke="#d4e157" stroke-opacity="0.24" stroke-width="2"/>
+
+  <g filter="url(#glow)">
+    <!-- A pixel cat's-eye chrysoberyl: a dark green stone with one bright
+         line across it. The line moves where SVG animation runs. -->
+    <path d="M66 37h49v7h-49zM59 44h7v7h-7zM115 44h7v7h-7zM52 51h7v7h-7zM122 51h7v7h-7zM45 58h7v7h-7zM129 58h7v7h-7zM38 65h7v7h-7zM136 65h7v7h-7zM38 72h7v7h-7zM136 72h7v7h-7zM38 79h7v7h-7zM136 79h7v7h-7zM38 86h7v7h-7zM136 86h7v7h-7zM38 93h7v7h-7zM136 93h7v7h-7zM38 100h7v7h-7zM136 100h7v7h-7zM38 107h7v7h-7zM136 107h7v7h-7zM45 114h7v7h-7zM129 114h7v7h-7zM52 121h7v7h-7zM122 121h7v7h-7zM59 128h7v7h-7zM115 128h7v7h-7zM66 135h49v7h-49z" fill="#5f7a2a"/>
+    <path d="M87 44h28v7h-28zM80 51h42v7h-42zM66 58h63v7h-63zM59 65h77v7h-77zM52 72h84v7h-84zM52 79h84v7h-84zM45 86h91v7h-91zM45 93h84v7h-84zM45 100h84v7h-84zM45 107h77v7h-77zM52 114h63v7h-63zM59 121h49v7h-49zM66 128h35v7h-35z" fill="#2f4a1f"/>
+    <path d="M66 44h21v7h-21zM59 51h21v7h-21zM52 58h14v7h-14zM45 65h14v7h-14zM45 72h7v7h-7zM45 79h7v7h-7zM129 93h7v7h-7zM129 100h7v7h-7zM122 107h14v7h-14zM115 114h14v7h-14zM108 121h14v7h-14zM101 128h14v7h-14z" fill="#4f6f2a"/>
+    <g clip-path="url(#stone)">
+      <rect x="87" y="37" width="7" height="105" fill="#f4f9d0" opacity="0.9">
+        <animate attributeName="x" values="66;108;66" dur="3.2s" repeatCount="indefinite"/>
+      </rect>
+    </g>
+
+    <path d="M42 0h7v7h-7zM252 0h7v7h-7zM420 0h14v7h-14zM42 7h7v7h-7zM252 7h7v7h-7zM427 7h7v7h-7zM7 14h21v7h-21zM42 14h28v7h-28zM84 14h7v7h-7zM98 14h14v7h-14zM126 14h7v7h-7zM154 14h7v7h-7zM175 14h28v7h-28zM217 14h21v7h-21zM252 14h28v7h-28zM301 14h21v7h-21zM336 14h7v7h-7zM350 14h14v7h-14zM378 14h7v7h-7zM406 14h7v7h-7zM427 14h7v7h-7zM0 21h7v7h-7zM42 21h7v7h-7zM70 21h7v7h-7zM84 21h14v7h-14zM126 21h7v7h-7zM154 21h7v7h-7zM168 21h7v7h-7zM210 21h7v7h-7zM238 21h7v7h-7zM252 21h7v7h-7zM280 21h7v7h-7zM294 21h7v7h-7zM322 21h7v7h-7zM336 21h14v7h-14zM378 21h7v7h-7zM406 21h7v7h-7zM427 21h7v7h-7zM0 28h7v7h-7zM42 28h7v7h-7zM70 28h7v7h-7zM84 28h7v7h-7zM126 28h7v7h-7zM154 28h7v7h-7zM175 28h21v7h-21zM210 28h7v7h-7zM238 28h7v7h-7zM252 28h7v7h-7zM280 28h7v7h-7zM294 28h35v7h-35zM336 28h7v7h-7zM378 28h7v7h-7zM406 28h7v7h-7zM427 28h7v7h-7zM0 35h7v7h-7zM42 35h7v7h-7zM70 35h7v7h-7zM84 35h7v7h-7zM126 35h7v7h-7zM154 35h7v7h-7zM196 35h7v7h-7zM210 35h7v7h-7zM238 35h7v7h-7zM252 35h7v7h-7zM280 35h7v7h-7zM294 35h7v7h-7zM336 35h7v7h-7zM378 35h7v7h-7zM406 35h7v7h-7zM427 35h7v7h-7zM7 42h21v7h-21zM42 42h7v7h-7zM70 42h7v7h-7zM84 42h7v7h-7zM133 42h28v7h-28zM168 42h28v7h-28zM217 42h21v7h-21zM252 42h28v7h-28zM301 42h21v7h-21zM336 42h7v7h-7zM385 42h28v7h-28zM427 42h14v7h-14zM154 49h7v7h-7zM406 49h7v7h-7zM133 56h21v7h-21zM385 56h21v7h-21z" fill="url(#ink)" transform="translate(160 62)"/>
+
+    <!-- A base and a candidate. One cell changed, and a box names it. -->
+    <g>
+      <rect x="637" y="70" width="12" height="12" fill="#5f7a2a"/>
+      <rect x="650" y="70" width="12" height="12" fill="#8bc34a"/>
+      <rect x="663" y="70" width="12" height="12" fill="#26a69a"/>
+      <rect x="637" y="83" width="12" height="12" fill="#26a69a"/>
+      <rect x="650" y="83" width="12" height="12" fill="#4f6f2a"/>
+      <rect x="663" y="83" width="12" height="12" fill="#5f7a2a"/>
+      <rect x="637" y="96" width="12" height="12" fill="#5f7a2a"/>
+      <rect x="650" y="96" width="12" height="12" fill="#8bc34a"/>
+      <rect x="663" y="96" width="12" height="12" fill="#26a69a"/>
+      <rect x="686" y="70" width="12" height="12" fill="#5f7a2a"/>
+      <rect x="699" y="70" width="12" height="12" fill="#8bc34a"/>
+      <rect x="712" y="70" width="12" height="12" fill="#26a69a"/>
+      <rect x="686" y="83" width="12" height="12" fill="#26a69a"/>
+      <rect x="699" y="83" width="12" height="12" fill="#4f6f2a"/>
+      <rect x="712" y="83" width="12" height="12" fill="#ec407a"/>
+      <rect x="686" y="96" width="12" height="12" fill="#5f7a2a"/>
+      <rect x="699" y="96" width="12" height="12" fill="#8bc34a"/>
+      <rect x="712" y="96" width="12" height="12" fill="#26a69a"/>
+    </g>
+    <rect x="709" y="80" width="18" height="18" fill="none" stroke="#f4f9d0" stroke-width="2">
+      <animate attributeName="opacity" values="1;0.2;1" dur="1.4s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+</svg>
