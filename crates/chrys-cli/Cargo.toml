@@ -15,6 +15,8 @@ pdf = ["dep:chrys-source-pdf"]
 # The native window and the GPU mirror. Off by default, so the CLI needs
 # no GPU driver.
 view = ["dep:chrys-view", "dep:chrys-gpu"]
+# AV1 video in IVF, decoded in software. Off by default.
+video = ["dep:chrys-source-video"]
 
 [[bin]]
 name = "chrys"
@@ -28,6 +30,7 @@ chrys-source-animation = { path = "../chrys-source-animation" }
 chrys-source-svg = { path = "../chrys-source-svg" }
 chrys-source-pdf = { path = "../chrys-source-pdf", optional = true }
 chrys-view = { path = "../chrys-view", optional = true }
+chrys-source-video = { path = "../chrys-source-video", optional = true }
 chrys-gpu = { path = "../chrys-gpu", optional = true }
 chrys-core = { path = "../chrys-core" }
 chrys-rule = { path = "../chrys-rule" }

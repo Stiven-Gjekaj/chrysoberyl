@@ -225,8 +225,7 @@ fn run_view(
     accept_name: Option<String>,
     store: PathBuf,
 ) -> anyhow::Result<ExitCode> {
-    let (names, base) = named_frames_for(base_path)?;
-    let (_, candidate) = named_frames_for(candidate_path)?;
+    let (names, base, candidate) = pair_frames_for(base_path, candidate_path)?;
     let verdicts = chrys_core::compare_sequence(&base, &candidate)?;
     let accept: Option<chrys_view::AcceptFn> = accept_name.map(|name| {
         let candidate_path = candidate_path.to_path_buf();
@@ -254,8 +253,7 @@ fn run_gpu_check(
     candidate_path: &Path,
     tolerance: u32,
 ) -> anyhow::Result<ExitCode> {
-    let (_, base) = named_frames_for(base_path)?;
-    let (_, candidate) = named_frames_for(candidate_path)?;
+    let (_, base, candidate) = pair_frames_for(base_path, candidate_path)?;
     let mirror = chrys_gpu::GpuMirror::new()?;
     let report = mirror.report();
     println!(
@@ -353,8 +351,7 @@ fn run_compare(
     // before any image decode work happens at all.
     let rules = rule_path.map(chrys_rule::load_rules).transpose()?;
 
-    let (base_names, base_frames) = named_frames_for(base_path)?;
-    let (_candidate_names, candidate_frames) = named_frames_for(candidate_path)?;
+    let (base_names, base_frames, candidate_frames) = pair_frames_for(base_path, candidate_path)?;
 
     // The manifest is checked, not decorated: when the base side came
     // from the baseline store, every frame's digest is recomputed and
@@ -362,8 +359,16 @@ fn run_compare(
     // disagreement fails the run and names the baseline, the frame, and
     // both digests, rather than silently comparing against a file the
     // manifest no longer describes.
+    //
+    // A video pair repeats a frame at each time where only the other side
+    // changes, so the digests are checked on the frames as decoded.
     if let Some(name) = baseline {
-        verify_baseline_digests(name, store, &base_frames)?;
+        if starts_like_video(base_path)? {
+            let (_, decoded) = named_frames_for(base_path)?;
+            verify_baseline_digests(name, store, &decoded)?;
+        } else {
+            verify_baseline_digests(name, store, &base_frames)?;
+        }
     }
 
     // The pixel comparison reads the CROPPED frames when `--region` was
@@ -763,6 +768,85 @@ fn translate_region(
     Ok(region)
 }
 
+/// Load the two sides of a pair: the base names, the base frames and the
+/// candidate frames.
+///
+/// Two video files pair by presentation time, so the two frame lists have
+/// one entry for each time. Each other input loads one side at a time.
+/// A video on one side only is an error, because a video and a still
+/// image have no common time.
+fn pair_frames_for(
+    base_path: &Path,
+    candidate_path: &Path,
+) -> anyhow::Result<(Vec<String>, Vec<Frame>, Vec<Frame>)> {
+    let base_is_video = !base_path.is_dir() && starts_like_video(base_path)?;
+    let candidate_is_video = !candidate_path.is_dir() && starts_like_video(candidate_path)?;
+    match (base_is_video, candidate_is_video) {
+        (true, true) => pair_videos(base_path, candidate_path),
+        (false, false) => {
+            let (names, base) = named_frames_for(base_path)?;
+            let (_, candidate) = named_frames_for(candidate_path)?;
+            Ok((names, base, candidate))
+        }
+        _ => anyhow::bail!(
+            "{} and {} are not both videos; a video compares with a video only",
+            base_path.display(),
+            candidate_path.display()
+        ),
+    }
+}
+
+/// Return true when `path` starts with the IVF signature.
+fn starts_like_video(path: &Path) -> anyhow::Result<bool> {
+    use std::io::Read;
+    let mut head = Vec::with_capacity(4);
+    std::fs::File::open(path)
+        .map_err(|error| anyhow::anyhow!("cannot read {}: {error}", path.display()))?
+        .take(4)
+        .read_to_end(&mut head)?;
+    Ok(head == b"DKIF")
+}
+
+/// Decode each frame of the video at `path`, in presentation order.
+#[cfg(feature = "video")]
+fn load_video(path: &Path) -> anyhow::Result<Vec<(String, Frame)>> {
+    Ok(chrys_source_video::VideoSource::new().load_named(path)?)
+}
+
+/// Refuse a video, because this binary has no video support.
+#[cfg(not(feature = "video"))]
+fn load_video(path: &Path) -> anyhow::Result<Vec<(String, Frame)>> {
+    anyhow::bail!(
+        "{} is a video file, and this binary was built without the `video` feature",
+        path.display()
+    )
+}
+
+/// Decode two videos and pair their frames by presentation time.
+#[cfg(feature = "video")]
+fn pair_videos(
+    base_path: &Path,
+    candidate_path: &Path,
+) -> anyhow::Result<(Vec<String>, Vec<Frame>, Vec<Frame>)> {
+    let source = chrys_source_video::VideoSource::new();
+    let base = source.load_video(base_path)?;
+    let candidate = source.load_video(candidate_path)?;
+    let paired = chrys_source_video::pair_by_time(&base, &candidate);
+    Ok((paired.names, paired.base, paired.candidate))
+}
+
+/// Refuse a video pair, because this binary has no video support.
+#[cfg(not(feature = "video"))]
+fn pair_videos(
+    base_path: &Path,
+    _candidate_path: &Path,
+) -> anyhow::Result<(Vec<String>, Vec<Frame>, Vec<Frame>)> {
+    anyhow::bail!(
+        "{} is a video file, and this binary was built without the `video` feature",
+        base_path.display()
+    )
+}
+
 /// Return true when the first 1024 bytes of `path` hold the `%PDF-` marker.
 ///
 /// This test is in the binary, not in the PDF crate, so a binary without
@@ -809,6 +893,8 @@ fn load_pdf(path: &Path) -> anyhow::Result<Vec<(String, Frame)>> {
 fn named_frames_for(path: &Path) -> anyhow::Result<(Vec<String>, Vec<Frame>)> {
     let named = if path.is_dir() {
         SequenceSource::new().load_named(path)?
+    } else if starts_like_video(path)? {
+        load_video(path)?
     } else if starts_like_pdf(path)? {
         load_pdf(path)?
     } else if chrys_source_svg::looks_like_svg(path)? {

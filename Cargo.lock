@@ -437,6 +437,7 @@ dependencies = [
  "chrys-source-raster",
  "chrys-source-sequence",
  "chrys-source-svg",
+ "chrys-source-video",
  "chrys-view",
  "clap",
  "serde",
