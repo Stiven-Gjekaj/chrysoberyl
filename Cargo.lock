@@ -202,6 +202,7 @@ dependencies = [
  "chrys-rule",
  "chrys-source",
  "chrys-source-animation",
+ "chrys-source-pdf",
  "chrys-source-raster",
  "chrys-source-sequence",
  "chrys-source-svg",

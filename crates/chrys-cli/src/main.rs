@@ -646,8 +646,40 @@ fn translate_region(
     Ok(region)
 }
 
+/// Return true when the first 1024 bytes of `path` hold the `%PDF-` marker.
+///
+/// This test is in the binary, not in the PDF crate, so a binary without
+/// the `pdf` feature still finds a PDF file and refuses it with a clear
+/// message.
+fn starts_like_pdf(path: &Path) -> anyhow::Result<bool> {
+    use std::io::Read;
+    let mut head = Vec::with_capacity(1024);
+    std::fs::File::open(path)
+        .map_err(|error| anyhow::anyhow!("cannot read {}: {error}", path.display()))?
+        .take(1024)
+        .read_to_end(&mut head)?;
+    Ok(head.windows(5).any(|window| window == b"%PDF-"))
+}
+
+/// Load each page of the PDF file at `path` as one frame.
+#[cfg(feature = "pdf")]
+fn load_pdf(path: &Path) -> anyhow::Result<Vec<(String, Frame)>> {
+    Ok(chrys_source_pdf::PdfSource::new().load_named(path)?)
+}
+
+/// Refuse the PDF file at `path`, because this binary has no PDF support.
+#[cfg(not(feature = "pdf"))]
+fn load_pdf(path: &Path) -> anyhow::Result<Vec<(String, Frame)>> {
+    anyhow::bail!(
+        "{} is a PDF file, and this binary was built without the `pdf` feature",
+        path.display()
+    )
+}
+
 /// Load the frames at `path`, each paired with the name of the file it
-/// came from, through `Source::load_named`. A directory loads as a
+/// came from, through `Source::load_named`. A file that holds the PDF
+/// marker loads through `PdfSource`, one frame for each page, when the
+/// `pdf` feature is on. A directory loads as a
 /// numbered frame sequence through `SequenceSource`, each frame beside
 /// its own file's name. A file whose content sniffs as an SVG document
 /// loads through `SvgSource`, checked before the animation sniff because
@@ -660,6 +692,8 @@ fn translate_region(
 fn named_frames_for(path: &Path) -> anyhow::Result<(Vec<String>, Vec<Frame>)> {
     let named = if path.is_dir() {
         SequenceSource::new().load_named(path)?
+    } else if starts_like_pdf(path)? {
+        load_pdf(path)?
     } else if chrys_source_svg::looks_like_svg(path)? {
         SvgSource::new().load_named(path)?
     } else if chrys_source_animation::sniff::is_animation(path)? {
