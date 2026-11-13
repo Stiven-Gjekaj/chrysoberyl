@@ -1,0 +1,53 @@
+# The build gate: format, lint and the whole test suite, with each optional
+# feature on, on the three operating systems.
+#
+# This workflow is separate from determinism.yml. A red job here means the
+# code is wrong. A red job there means two machines disagree, which is a
+# portability fault. The two are different news.
+#
+# A GPU test needs an adapter, and a runner has none, so those tests are
+# ignored here. They run on a machine with a GPU:
+#
+#     cargo test -p chrys-gpu -- --ignored
+name: CI
+
+"on":
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  FEATURES: chrys-cli/pdf,chrys-cli/view,chrys-cli/video,chrys-cli/mesh
+
+jobs:
+  tests:
+    name: tests (${{ matrix.label }})
+    runs-on: ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        label:
+          - ubuntu-24.04
+          - macos-15
+          - windows-2022
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # No toolchain-install action. The runner's own rustup reads
+      # rust-toolchain.toml, which pins the channel, rustfmt and clippy.
+      - name: Check the formatting
+        shell: bash
+        run: cargo fmt --all --check
+
+      - name: Lint with clippy
+        shell: bash
+        run: cargo clippy --workspace --all-targets --features "$FEATURES" -- -D warnings
+
+      # --no-fail-fast, because the first failing test binary stops cargo
+      # otherwise, and a second fault stays hidden until the first is fixed.
+      - name: Run the workspace tests with every feature
+        shell: bash
+        run: cargo test --workspace --no-fail-fast --features "$FEATURES"

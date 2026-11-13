@@ -42,27 +42,6 @@ jobs:
         shell: bash
         run: cargo test -p chrys-core --test determinism
 
-  # The whole test suite, with every optional feature on, on the three
-  # operating systems. A GPU test needs an adapter, and a runner has none,
-  # so those tests are ignored here. They run on a machine with a GPU.
-  tests:
-    name: tests (${{ matrix.label }})
-    runs-on: ${{ matrix.label }}
-    strategy:
-      fail-fast: false
-      matrix:
-        label:
-          - ubuntu-24.04
-          - macos-15
-          - windows-2022
-    steps:
-      - name: Check out the repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Run the workspace tests with every feature
-        shell: bash
-        run: cargo test --workspace --no-fail-fast --features chrys-cli/pdf,chrys-cli/view,chrys-cli/video,chrys-cli/mesh
-
   digest:
     name: digest (${{ matrix.label }})
     runs-on: ${{ matrix.label }}
