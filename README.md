@@ -205,9 +205,20 @@ a flaky test.
 
 ---
 
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) to start,
+follow the [Code of Conduct](CODE_OF_CONDUCT.md), and read
+[SUPPORT.md](SUPPORT.md) if you need help. The [changelog](CHANGELOG.md)
+records what changed. Report a security problem as
+[SECURITY.md](SECURITY.md) says.
+
+---
+
 ## License
 
-Released under the MIT License. See [LICENSE](LICENSE) for the full text.
+Released under the MIT License. See [LICENSE](LICENSE) for the full text, and
+[TERMS.md](TERMS.md) for the project terms.
 
 <div align="center">
 <sub>Built in Rust. One engine, one meaning of "changed".</sub>
