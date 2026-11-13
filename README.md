@@ -15,6 +15,8 @@ _It reports what changed, not which pixels differ, and it gives the same verdict
 
 <p align="center">
   <a href="https://github.com/stiven-gjekaj/chrysoberyl/actions/workflows/determinism.yml"><img src="https://github.com/stiven-gjekaj/chrysoberyl/actions/workflows/determinism.yml/badge.svg" alt="The determinism workflow"/></a>
+  <a href="https://github.com/stiven-gjekaj/chrysoberyl/actions/workflows/ci.yml"><img src="https://github.com/stiven-gjekaj/chrysoberyl/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
+  <a href="https://github.com/stiven-gjekaj/chrysoberyl/releases/latest"><img src="https://img.shields.io/github/v/release/stiven-gjekaj/chrysoberyl?style=flat-square&color=blue&label=release" alt="The latest GitHub release"/></a>
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License"/>
 </p>
 
@@ -23,7 +25,8 @@ _It reports what changed, not which pixels differ, and it gives the same verdict
   <a href="#features"><b>Features</b></a> |
   <a href="#formats"><b>Formats</b></a> |
   <a href="#rules"><b>Rules</b></a> |
-  <a href="docs/DESIGN.md"><b>Design</b></a>
+  <a href="docs/DESIGN.md"><b>Design</b></a> |
+  <a href="https://stiven-gjekaj.github.io/chrysoberyl/"><b>API</b></a>
 </p>
 
 </div>
@@ -80,6 +83,14 @@ decoder.
 ---
 
 ## Quick Start
+
+Download an archive for your platform from the
+[latest release](https://github.com/stiven-gjekaj/chrysoberyl/releases/latest).
+Each archive holds the `chrys` binary with PDF, video and mesh support. The
+macOS and Windows binaries also hold the window. Check a download against
+`SHA256SUMS`.
+
+Or build from source:
 
 ```bash
 cargo build --release -p chrys-cli
