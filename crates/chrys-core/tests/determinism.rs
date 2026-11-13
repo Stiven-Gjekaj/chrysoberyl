@@ -41,7 +41,7 @@
 //! own planner drill replaces `register/window.rs`'s scalar FFT planner
 //! construction with `rustfft`'s auto-dispatching one, and expects
 //! `scripts/cross-arch-hash.sh` to disagree between architectures
-//! (01-RESEARCH.md's Pitfall 3: the auto-dispatching planner detects CPU
+//! (`docs/DESIGN.md`, "Lessons": the auto-dispatching planner detects CPU
 //! features at runtime, and two machines can then take different
 //! arithmetic through the same call). Running that drill on this
 //! project's own development machine found that it does not: an
@@ -87,33 +87,28 @@ const ALLOWED_MATHS: &[(&str, &str)] = &[(
 /// plus a cross-architecture test case near subnormal values, because
 /// this method's own software fallback has had real, historical rounding
 /// faults in shipped standard libraries. See this module's own doc
-/// comment and `.planning/phases/01-raster-engine-and-determinism-proof/
-/// 01-RESEARCH.md`'s Pitfall 2.
+/// comment.
 const FUSED_MULTIPLY_ADD: &str = "mul_add";
 
 /// The one FFT planner constructor the comparison path may call.
 /// `rustfft::FftPlannerScalar` never dispatches on runtime CPU features.
 /// `rustfft::FftPlanner`, its auto-dispatching sibling, does, and two
 /// machines running the same build can then take different arithmetic
-/// through the same call (`register/window.rs`'s own doc comment;
-/// 01-RESEARCH.md's Pitfall 3). This constant names the auto-dispatching
+/// through the same call (`register/window.rs`'s own doc comment). This constant names the auto-dispatching
 /// constructor precisely (`FftPlanner::new(`, not `FftPlannerScalar::new(`,
 /// a distinct substring) so the search below cannot confuse the two.
 const AUTO_DISPATCHING_FFT_PLANNER_CONSTRUCTOR: &str = "FftPlanner::new(";
 
 /// Crate names `chrys-core`'s own dependency graph may never contain.
 ///
-/// Two rules produce this list. First, `.planning/PROJECT.md`'s own
-/// invariant: no pixel that enters a comparison is produced by a GPU. No
+/// Two rules produce this list. First, invariant 1 in `docs/DESIGN.md`: no pixel that enters a comparison is produced by a GPU. No
 /// crate that can drive a GPU may enter the engine's graph, so this list
-/// names the graphics and GPU crates this project's own research
-/// (`.planning/research/ARCHITECTURE.md`) identifies as what this
-/// project would otherwise reach for (`wgpu` for the future `chrys-gpu`
+/// names the graphics and GPU crates that this project would otherwise
+/// reach for (`wgpu` for the future `chrys-gpu`
 /// compute mirror, `slint` for the future `chrys-window` native window),
 /// plus the other crate names most Rust GPU and graphics work reaches
 /// for instead, so a differently-named route to a GPU is still caught by
-/// category. Second, `.planning/research/ARCHITECTURE.md`'s format-blind
-/// rule: `chrys-core` sees only `Vec<Frame>` of RGBA8, and a format
+/// category. Second, the format-blind rule in `docs/DESIGN.md`: `chrys-core` sees only `Vec<Frame>` of RGBA8, and a format
 /// crate anywhere in its graph would mean a format reached the engine,
 /// defeating the "no per-format special case" rule this project treats
 /// as a compile-time fact, not a rule a person has to remember. This
@@ -410,8 +405,7 @@ fn a_fused_multiply_add_call_needs_an_allow_list_entry_and_a_subnormal_test() {
          this test's own allow-list, plus a cross-architecture test case \
          near subnormal values in the cross-architecture matrix, because \
          mul_add's software fallback has had real, historical rounding \
-         faults in shipped standard libraries (see 01-RESEARCH.md \
-         Pitfall 2):\n{}",
+         faults in shipped standard libraries:\n{}",
         hits.iter()
             .map(Hit::to_string)
             .collect::<Vec<_>>()
@@ -689,7 +683,7 @@ fn the_comparison_path_never_constructs_the_auto_dispatching_fft_planner() {
          FftPlanner, which detects CPU features at runtime and can take \
          different arithmetic on two machines for the same call. Use \
          FftPlannerScalar instead (see register/window.rs's own doc \
-         comment and 01-RESEARCH.md's Pitfall 3):\n{}",
+         comment):\n{}",
         hits.iter()
             .map(|(file, line)| format!(
                 "{}:{} constructs `{AUTO_DISPATCHING_FFT_PLANNER_CONSTRUCTOR}`",

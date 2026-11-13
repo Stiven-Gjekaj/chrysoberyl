@@ -2,12 +2,11 @@
 //!
 //! This module owns a two-pass, union-find connected-component labelling
 //! algorithm (Wu, Otoo and Suzuki, "Two Strategies to Speed Up Connected
-//! Component Labeling Algorithms," 2009, cited by
-//! `.planning/research/ARCHITECTURE.md`). This module used to call
+//! Component Labeling Algorithms," 2009). This module used to call
 //! `imageproc::region_labelling::connected_components` instead. That call
 //! reached the `image` crate transitively, through `imageproc`'s own
-//! re-export, and `.planning/research/ARCHITECTURE.md` states that
-//! `chrys-core` may not import a format crate: the "no per-format special
+//! re-export, and `docs/DESIGN.md` states that `chrys-core` may not
+//! import a format crate: the "no per-format special
 //! case" rule is meant to be a compile-time fact, checked by the
 //! dependency guard in `tests/determinism.rs`, not a rule a person has to
 //! remember. A transitive `image` dependency defeated that fact.
@@ -149,8 +148,8 @@ fn labelled_neighbour(
 /// boxes.
 ///
 /// A pixel is a change when the largest of its four residual bytes exceeds
-/// `RESIDUAL_THRESHOLD`. Alpha is part of what "changed" means (see
-/// PROJECT.md's Key Decisions), so the fourth byte is read on the same
+/// `RESIDUAL_THRESHOLD`. Alpha is part of what "changed" means (a
+/// decision of 2026-09-07), so the fourth byte is read on the same
 /// footing as the other three, not dropped. Two regions touching only at a
 /// corner are one region, because connectivity is eight-way.
 ///

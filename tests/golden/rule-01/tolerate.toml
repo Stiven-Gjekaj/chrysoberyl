@@ -1,5 +1,5 @@
 # The rule-01 fixture's one Recoloured region measures a colour delta of
-# 115.65 (recorded verbatim in 03-01-SUMMARY.md). 116.0 is just above that
+# 115.65, measured in phase 3. 116.0 is just above that
 # measured value, not a number chosen until the test passes.
 
 [[rule]]

@@ -2,11 +2,10 @@
 //! tree names `fontdb::Database::load_system_fonts`, the host-font-
 //! database loader, by name.
 //!
-//! **A second, independent check on the same property.** `04-01-SUMMARY.
-//! md` and `svg_boundary_guard.rs` together give DET-05 a compile-time
-//! guard: `resvg`'s `system-fonts` Cargo feature is off workspace-wide,
-//! so the loader is absent from the built binary. `01-LEARNINGS.md`
-//! already recorded, for a different property, that a guard resting on
+//! **A second, independent check on the same property.**
+//! `svg_boundary_guard.rs` gives DET-05 a compile-time guard: `resvg`'s `system-fonts` Cargo feature is off workspace-wide,
+//! so the loader is absent from the built binary. Phase 1 already
+//! recorded, for a different property, that a guard resting on
 //! one mechanism can be blind exactly where it is needed. If a future
 //! change re-enables the Cargo feature, `svg_boundary_guard.rs` catches
 //! it. If a future change reaches the loader some other way — a second

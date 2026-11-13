@@ -81,7 +81,7 @@ git -C "$drill_worktree" checkout -- crates/chrys-core/src/register/window.rs
 
 # --- Drill two: the planner drill ----------------------------------------
 # Replace the scalar transform planner with the auto-dispatching one.
-# This is the sharpest pitfall in the phase (01-RESEARCH.md's Pitfall 3):
+# This is the sharpest pitfall in the phase (docs/DESIGN.md, "Lessons"):
 # two machines can take different arithmetic through the same call when
 # the planner is left free to choose.
 #

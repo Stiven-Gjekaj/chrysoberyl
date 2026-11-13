@@ -25,11 +25,10 @@
 //! because D-03 makes sharing the first one impossible.
 //!
 //! **Drilled, not only written.** Phase 1 found a guard that could not go
-//! red and had been reporting green for a whole phase
-//! (`01-LEARNINGS.md`, "A guard that cannot go red reports green
-//! forever"). This guard was planted with two defects, each in a
-//! disposable git worktree, and each drill's own output is recorded
-//! verbatim in `03-03-SUMMARY.md`: one planting an unexpected call site
+//! red and had been reporting green for a whole phase (`docs/DESIGN.md`,
+//! "Lessons"). This guard was planted with two defects, each in a
+//! disposable git worktree, and each drill went red: one planting an
+//! unexpected call site
 //! inside `crates/chrys-rule/src/mask.rs`, the other deleting one of the
 //! two allow-listed call sites from
 //! `crates/chrys-source-raster/src/decode.rs`. Both drills went red and

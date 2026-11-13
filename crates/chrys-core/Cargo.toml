@@ -21,8 +21,8 @@ libm.workspace = true
 # every colour transcendental through pure Rust instead. The two smaller
 # colour-difference crates the research probed and rejected on a
 # suspicious download-volume verdict, with no documented pure-Rust
-# transcendental route, are named in 01-RESEARCH.md's Alternatives
-# Considered table, not here: a grep gate over this file keeps them out
+# transcendental route, are named in the phase 1 research in the git
+# history, not here: a grep gate over this file keeps them out
 # of the manifest, and naming them here would defeat that gate.
 palette.workspace = true
 

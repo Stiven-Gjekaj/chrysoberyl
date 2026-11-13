@@ -76,7 +76,7 @@ fn only_the_text_feature_of_resvg_is_enabled() {
     // resolved feature graph. Feature unification means a second crate
     // elsewhere in this workspace could turn `system-fonts` or
     // `memmap-fonts` back on without any manifest line ever changing;
-    // `02-LEARNINGS.md` already records the rule this test follows:
+    // Phase 2 already recorded the rule this test follows:
     // verify with `cargo tree`, not with the declared list. Checked
     // first, and its own assertion messages name the exact feature that
     // came back, so a drill that restores resvg's default features fails
