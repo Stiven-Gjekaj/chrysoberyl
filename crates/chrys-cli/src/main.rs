@@ -102,6 +102,45 @@ enum Command {
         report: Option<PathBuf>,
     },
 
+    /// Open a pair in a native window.
+    ///
+    /// The paths follow the same rule as `compare`. The `a` key accepts the
+    /// candidate as the baseline named by `--baseline` or `--accept-as`.
+    #[cfg(feature = "view")]
+    View {
+        /// The base, then the candidate. With `--baseline`: the candidate.
+        #[arg(required = true, num_args = 1..=2)]
+        paths: Vec<PathBuf>,
+
+        /// Read the base from the baseline of this name.
+        #[arg(long)]
+        baseline: Option<String>,
+
+        /// The name that an accept writes. The default is `--baseline`.
+        #[arg(long)]
+        accept_as: Option<String>,
+
+        /// The baseline store root.
+        #[arg(long, default_value = DEFAULT_STORE_ROOT)]
+        store: PathBuf,
+    },
+
+    /// Check the GPU mirror against the CPU engine on one pair.
+    ///
+    /// This prints the adapter and the result of the categorical check.
+    /// It exits 0 when the two agree, and 1 when they do not.
+    #[cfg(feature = "view")]
+    GpuCheck {
+        /// The base image.
+        base: PathBuf,
+        /// The candidate image.
+        candidate: PathBuf,
+        /// The largest edge difference, in pixels, between two boxes that
+        /// agree.
+        #[arg(long, default_value_t = 2)]
+        tolerance: u32,
+    },
+
     /// Accept PATH as the new baseline named NAME.
     ///
     /// An accept is a statement: this candidate is now correct. Every
@@ -157,7 +196,85 @@ fn run() -> anyhow::Result<ExitCode> {
             )
         }
         Command::Accept { name, path, store } => run_accept(&name, &path, &store),
+        #[cfg(feature = "view")]
+        Command::View {
+            paths,
+            baseline,
+            accept_as,
+            store,
+        } => {
+            let (base_path, candidate_path) =
+                base_and_candidate(paths, baseline.as_deref(), &store)?;
+            run_view(&base_path, &candidate_path, accept_as.or(baseline), store)
+        }
+        #[cfg(feature = "view")]
+        Command::GpuCheck {
+            base,
+            candidate,
+            tolerance,
+        } => run_gpu_check(&base, &candidate, tolerance),
     }
+}
+
+/// Open the pair in the window. The CPU engine decides each verdict
+/// before the window opens. The window shows the verdicts only.
+#[cfg(feature = "view")]
+fn run_view(
+    base_path: &Path,
+    candidate_path: &Path,
+    accept_name: Option<String>,
+    store: PathBuf,
+) -> anyhow::Result<ExitCode> {
+    let (names, base) = named_frames_for(base_path)?;
+    let (_, candidate) = named_frames_for(candidate_path)?;
+    let verdicts = chrys_core::compare_sequence(&base, &candidate)?;
+    let accept: Option<chrys_view::AcceptFn> = accept_name.map(|name| {
+        let candidate_path = candidate_path.to_path_buf();
+        Box::new(move || {
+            run_accept(&name, &candidate_path, &store)
+                .map(|_| format!("accepted as baseline \"{name}\""))
+                .map_err(|error| error.to_string())
+        }) as chrys_view::AcceptFn
+    });
+    let pair = chrys_view::ViewPair {
+        base,
+        candidate,
+        names,
+        verdicts,
+    };
+    chrys_view::run(pair, accept)?;
+    Ok(ExitCode::from(0))
+}
+
+/// Compare one pair on the CPU and on the GPU, and print the categorical
+/// check. The CPU verdict is the verdict. The GPU result is evidence only.
+#[cfg(feature = "view")]
+fn run_gpu_check(
+    base_path: &Path,
+    candidate_path: &Path,
+    tolerance: u32,
+) -> anyhow::Result<ExitCode> {
+    let (_, base) = named_frames_for(base_path)?;
+    let (_, candidate) = named_frames_for(candidate_path)?;
+    let mirror = chrys_gpu::GpuMirror::new()?;
+    let report = mirror.report();
+    println!(
+        "adapter {} (vendor {:#06x}, {})",
+        report.name, report.vendor, report.backend
+    );
+    let verdicts = chrys_core::compare_sequence(&base, &candidate)?;
+    let mut worst = 0u8;
+    for (index, verdict) in verdicts.iter().enumerate() {
+        let boxes = mirror
+            .difference(&base[index], &candidate[index])?
+            .changed_boxes();
+        let agreement = chrys_gpu::agree(verdict, &boxes, tolerance);
+        println!("frame {index}: {agreement:?}");
+        if !matches!(agreement, chrys_gpu::Agreement::Agree) {
+            worst = 1;
+        }
+    }
+    Ok(ExitCode::from(worst))
 }
 
 /// Resolve `paths` and an optional `--baseline` name into the base and

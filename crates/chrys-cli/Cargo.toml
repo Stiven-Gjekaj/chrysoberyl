@@ -12,6 +12,9 @@ workspace = true
 # PDF input. It is off by default, because its determinism proof is
 # younger than the proof for the other formats.
 pdf = ["dep:chrys-source-pdf"]
+# The native window and the GPU mirror. Off by default, so the CLI needs
+# no GPU driver.
+view = ["dep:chrys-view", "dep:chrys-gpu"]
 
 [[bin]]
 name = "chrys"
@@ -24,6 +27,8 @@ chrys-source-sequence = { path = "../chrys-source-sequence" }
 chrys-source-animation = { path = "../chrys-source-animation" }
 chrys-source-svg = { path = "../chrys-source-svg" }
 chrys-source-pdf = { path = "../chrys-source-pdf", optional = true }
+chrys-view = { path = "../chrys-view", optional = true }
+chrys-gpu = { path = "../chrys-gpu", optional = true }
 chrys-core = { path = "../chrys-core" }
 chrys-rule = { path = "../chrys-rule" }
 chrys-baseline = { path = "../chrys-baseline" }
