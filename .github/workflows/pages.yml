@@ -1,0 +1,71 @@
+# Builds the API documentation of the workspace and publishes it to GitHub
+# Pages.
+#
+# Chrysoberyl runs as a library as well as a command line tool, so the
+# published site is the documentation of its crates. The front page is the
+# engine, `chrys_core`.
+#
+# This workflow is separate from ci.yml. A failure here means the site did not
+# deploy, not that the code is wrong.
+#
+# The Pages source of the repository must be "GitHub Actions" (Settings,
+# Pages, Build and deployment). Without it the deploy step fails with a 404
+# that does not say why.
+name: Pages
+
+"on":
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A running deploy finishes. A half-published site is never left behind.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the documentation
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build the documentation
+        shell: bash
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: |
+          set -euo pipefail
+          cargo doc --workspace --no-deps --features chrys-cli/pdf,chrys-cli/view,chrys-cli/video,chrys-cli/mesh
+          # rustdoc writes no page at the root. This one sends a reader to
+          # the engine.
+          cat > target/doc/index.html <<'HTML'
+          <!doctype html>
+          <meta charset="utf-8">
+          <title>Chrysoberyl</title>
+          <meta http-equiv="refresh" content="0; url=chrys_core/index.html">
+          <a href="chrys_core/index.html">Chrysoberyl API documentation</a>
+          HTML
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: target/doc
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
