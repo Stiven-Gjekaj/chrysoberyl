@@ -415,7 +415,7 @@ checksum = "f079e83a288787bcd14a6aea84cee5c87a67c5a3e660c30f557a3d24761b3527"
 
 [[package]]
 name = "chrys-baseline"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "serde",
  "thiserror 2.0.20",
@@ -424,7 +424,7 @@ dependencies = [
 
 [[package]]
 name = "chrys-cli"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "chrys-baseline",
@@ -447,7 +447,7 @@ dependencies = [
 
 [[package]]
 name = "chrys-core"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "chrys-source",
  "chrys-source-raster",
@@ -460,7 +460,7 @@ dependencies = [
 
 [[package]]
 name = "chrys-gpu"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "bytemuck",
  "chrys-core",
@@ -473,7 +473,7 @@ dependencies = [
 
 [[package]]
 name = "chrys-rule"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "chrys-core",
  "chrys-source",
@@ -486,11 +486,11 @@ dependencies = [
 
 [[package]]
 name = "chrys-source"
-version = "0.1.0"
+version = "1.0.0"
 
 [[package]]
 name = "chrys-source-animation"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "chrys-source",
  "chrys-source-raster",
@@ -501,7 +501,7 @@ dependencies = [
 
 [[package]]
 name = "chrys-source-mesh"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "chrys-source",
  "png",
@@ -510,7 +510,7 @@ dependencies = [
 
 [[package]]
 name = "chrys-source-pdf"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "chrys-source",
  "fearless_simd 0.7.0",
@@ -520,7 +520,7 @@ dependencies = [
 
 [[package]]
 name = "chrys-source-raster"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "chrys-source",
  "image",
@@ -531,7 +531,7 @@ dependencies = [
 
 [[package]]
 name = "chrys-source-sequence"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "chrys-source",
  "chrys-source-raster",
@@ -541,7 +541,7 @@ dependencies = [
 
 [[package]]
 name = "chrys-source-svg"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "chrys-source",
  "chrys-source-raster",
@@ -552,7 +552,7 @@ dependencies = [
 
 [[package]]
 name = "chrys-source-video"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "chrys-source",
  "re_rav1d",
@@ -562,7 +562,7 @@ dependencies = [
 
 [[package]]
 name = "chrys-view"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "bytemuck",
  "chrys-core",
