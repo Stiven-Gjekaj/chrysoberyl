@@ -22,7 +22,7 @@ mod report;
 /// reads its diff in a pull request (BASE-01).
 const DEFAULT_STORE_ROOT: &str = "chrys-baselines";
 
-/// A structural diff for raster images.
+/// A structural diff for everything that is not text.
 #[derive(Parser)]
 #[command(name = "chrys")]
 struct Cli {
@@ -32,7 +32,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Compare two raster images and print a verdict.
+    /// Compare two inputs and print a verdict.
     ///
     /// With no `--baseline`, this takes exactly two paths: the base image,
     /// then the candidate. With `--baseline NAME`, this takes exactly one
